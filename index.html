@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cutscene Studio Pro - Multi-Track</title>
+  <title>Cutscene Studio Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --bg: #0f111a; --panel: #1a1d2d; --accent: #7c3aed; --border: #2e334d; --text: #f3f4f6; }
@@ -21,8 +21,8 @@
 
     #auth-screen { max-width: 400px; margin: 80px auto; }
     
-    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; cursor: pointer; }
-    .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; }
+    .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: transform 0.05s linear; }
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; }
 
@@ -36,13 +36,15 @@
     .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 120px; width: 100%; }
     
     .track-row { position: relative; height: 36px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; display: flex; align-items: center; }
-    .track-label { width: 100px; font-size: 11px; font-weight: bold; padding-left: 8px; color: #a7f3d0; border-right: 1px solid var(--border); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    .track-label { width: 100px; font-size: 11px; font-weight: bold; padding-left: 8px; color: #a7f3d0; border-right: 1px solid var(--border); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
     .track-content { position: relative; flex: 1; height: 100%; }
 
     .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
     .timeline-block.actor-track { background: #10b981; }
     .timeline-block.dialogue { background: #f59e0b; }
     .timeline-block.move { background: #3b82f6; }
+
+    .resizer { position: absolute; right: 0; top: 0; width: 8px; height: 100%; cursor: e-resize; background: rgba(0,0,0,0.3); border-radius: 0 4px 4px 0; }
     
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
     .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 900px; margin: 0 auto; border: 1px solid var(--border); }
@@ -78,7 +80,7 @@
     <div class="grid">
       <div>
         <div class="panel">
-          <h3>1. Gestione Entità (Aggiungi in Timeline)</h3>
+          <h3>1. Gestione Entità</h3>
           
           <div class="field">
             <label>Sfondo Scena:</label>
@@ -158,7 +160,6 @@
 
       <div>
         <div id="stage" class="stage-container" onclick="handleStageGlobalClick(event)">
-          <!-- Gli attori sullo stage vengono creati dinamicamente -->
           <div id="dialogue-overlay">
             <div class="speaker" id="dialogue-speaker-name">Speaker</div>
             <div class="text" id="dialogue-text-content">...</div>
@@ -214,7 +215,6 @@
     let backgroundPath = '';
     let musicPath = '';
     
-    // Lista dinamica dei personaggi inseriti nella Timeline
     const actorsList = [
       { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [100, 150] }
     ];
@@ -277,8 +277,10 @@
 
         document.addEventListener('mousemove', (e) => {
           if (!isDragging) return;
-          const x = Math.max(0, Math.min(736, e.clientX + offset[0]));
-          const y = Math.max(0, Math.min(296, e.clientY + offset[1]));
+          const maxW = stage.clientWidth - 64;
+          const maxH = stage.clientHeight - 64;
+          const x = Math.max(0, Math.min(maxW, e.clientX + offset[0]));
+          const y = Math.max(0, Math.min(maxH, e.clientY + offset[1]));
           div.style.left = x + 'px';
           div.style.top = y + 'px';
           actor.pos = [x, y];
@@ -354,7 +356,6 @@
               musicPath = fullPath;
               document.getElementById('lbl-music').innerText = `✅ ${item.name}`;
             } else {
-              // Aggiungi Nuovo Attore in Timeline
               const name = document.getElementById('new-actor-name').value;
               const newActor = {
                 id: 'actor_' + Date.now(),
@@ -380,7 +381,6 @@
       const tracksContainer = document.getElementById('timeline-tracks');
       tracksContainer.innerHTML = '';
 
-      // 1. Tracce degli Attori (PNG, Companion, Hero)
       actorsList.forEach(actor => {
         const row = document.createElement('div');
         row.className = 'track-row';
@@ -393,12 +393,10 @@
         block.style.left = '0%';
         block.style.width = '100%';
         block.innerText = `${actor.type.toUpperCase()}: ${actor.name}`;
-        
         block.onclick = () => openActorInspector(actor);
         content.appendChild(block);
       });
 
-      // 2. Traccia Eventi (Dialoghi e Movimenti)
       const eventRow = document.createElement('div');
       eventRow.className = 'track-row';
       eventRow.innerHTML = `<div class="track-label">🎬 Eventi</div><div class="track-content" id="track-events"></div>`;
@@ -411,6 +409,35 @@
         block.style.left = `${(ev.start / 10) * 100}%`;
         block.style.width = `${(ev.duration / 10) * 100}%`;
         block.innerText = ev.type === 'dialogue' ? `💬 ${ev.speaker}: ${ev.text}` : `🏃 ${ev.actor}`;
+        
+        const resizer = document.createElement('div');
+        resizer.className = 'resizer';
+        block.appendChild(resizer);
+
+        resizer.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          let startX = e.clientX;
+          let initialWidth = block.offsetWidth;
+          let trackWidth = eventContent.offsetWidth;
+
+          function onMouseMove(e) {
+            let deltaX = e.clientX - startX;
+            let newWidthPx = Math.max(20, initialWidth + deltaX);
+            let newDuration = parseFloat(((newWidthPx / trackWidth) * 10).toFixed(1));
+            ev.duration = Math.min(10 - ev.start, newDuration);
+            block.style.width = `${(ev.duration / 10) * 100}%`;
+          }
+
+          function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            renderTimeline();
+          }
+
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+
         block.onclick = () => openEventInspector(ev);
         eventContent.appendChild(block);
       });
@@ -422,6 +449,7 @@
       container.innerHTML = `
         <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:10px;">
           <div class="field"><label>Nome Personaggio:</label><input type="text" id="edit-actor-name" value="${actor.name}"></div>
+          <button style="background:#8b5cf6;" onclick="quickAddMoveForActor('${actor.name}')">+ Aggiungi Movimento per questo Sprite</button>
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn-success" onclick="saveActorInspector('${actor.id}')">Salva</button>
             ${actor.id !== 'hero' ? `<button style="background:#dc3545;" onclick="deleteActor('${actor.id}')">🗑 Rimuovi dalla Timeline</button>` : ''}
@@ -429,6 +457,14 @@
         </div>
       `;
       document.getElementById('picker-modal').style.display = 'block';
+    }
+
+    function quickAddMoveForActor(actorName) {
+      closePicker();
+      document.getElementById('event-type').value = 'move';
+      toggleEventInputs();
+      document.getElementById('move-actor').value = actorName;
+      startClickMovement();
     }
 
     function saveActorInspector(actorId) {
@@ -456,8 +492,8 @@
       const container = document.getElementById('asset-container');
       container.innerHTML = `
         <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:10px;">
-          <div class="field"><label>Inizio (s):</label><input type="number" id="edit-ev-start" value="${ev.start}"></div>
-          <div class="field"><label>Durata (s):</label><input type="number" id="edit-ev-duration" value="${ev.duration}"></div>
+          <div class="field"><label>Inizio (s):</label><input type="number" id="edit-ev-start" value="${ev.start}" step="0.5"></div>
+          <div class="field"><label>Durata (s):</label><input type="number" id="edit-ev-duration" value="${ev.duration}" step="0.5"></div>
           <div style="display:flex; gap:10px;">
             <button class="btn-success" onclick="saveEventInspector(${ev.id})">Salva Evento</button>
             <button style="background:#dc3545;" onclick="deleteEvent(${ev.id})">Elimina</button>
@@ -511,7 +547,7 @@
 
     function startClickMovement() {
       clickMoveStep = 1;
-      alert("Clicca per Posizione di PARTENZA");
+      alert("Clicca sullo stage per la Posizione di PARTENZA");
     }
 
     function handleStageGlobalClick(e) {
@@ -529,7 +565,7 @@
         document.getElementById('move-x1').value = x;
         document.getElementById('move-y1').value = y;
         clickMoveStep = 2;
-        alert("Clicca per Posizione di ARRIVO");
+        alert("Clicca sullo stage per la Posizione di ARRIVO");
       } else if (clickMoveStep === 2) {
         document.getElementById('move-x2').value = x;
         document.getElementById('move-y2').value = y;
@@ -550,7 +586,22 @@
 
       previewTimer = setInterval(() => {
         if (!isPreviewRunning || isDialogueWaiting) return;
+        
         timelineEvents.forEach(ev => {
+          if (ev.type === 'move' && currentTime >= ev.start && currentTime <= (ev.start + ev.duration)) {
+            const actorObj = actorsList.find(a => a.name === ev.actor);
+            if (actorObj) {
+              const dom = document.getElementById(`actor-dom-${actorObj.id}`);
+              if (dom) {
+                const progress = (currentTime - ev.start) / ev.duration;
+                const currentX = ev.from[0] + (ev.to[0] - ev.from[0]) * progress;
+                const currentY = ev.from[1] + (ev.to[1] - ev.from[1]) * progress;
+                dom.style.left = currentX + 'px';
+                dom.style.top = currentY + 'px';
+              }
+            }
+          }
+
           if (!triggered.has(ev.id) && currentTime >= ev.start) {
             triggered.add(ev.id);
             if (ev.type === 'dialogue') {
@@ -561,10 +612,11 @@
             }
           }
         });
-        currentTime += 0.1;
+
+        currentTime += 0.05;
         document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
         if (currentTime >= 10.0) stopPreview();
-      }, 100);
+      }, 50);
     }
 
     function stopPreview() {
@@ -573,6 +625,7 @@
       if (previewTimer) clearInterval(previewTimer);
       bgAudio.pause();
       document.getElementById('dialogue-overlay').style.display = 'none';
+      renderStageActors();
     }
 
     function generateJSONData() {
