@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cutscene Studio</title>
+  <title>Cutscene Studio Studio Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --bg: #121212; --panel: #1e1e1e; --accent: #007acc; --border: #333; --text: #fff; }
@@ -18,26 +18,32 @@
     button:hover { opacity: 0.9; }
     .btn-select { background: #3a3a3a; border: 1px dashed #666; text-align: left; }
     .btn-success { background: #28a745; }
-    .btn-warning { background: #e67e22; width: 100%; margin-top: 10px; }
-    .track { display: flex; flex-direction: column; gap: 8px; background: #2a2a2a; padding: 10px; border-radius: 4px; min-height: 100px; }
-    .block { background: #333; border-left: 4px solid var(--accent); padding: 10px; border-radius: 4px; cursor: grab; display: flex; justify-content: space-between; }
+    .btn-warning { background: #e67e22; }
+    .btn-preview { background: #9b59b6; width: 100%; font-size: 1.1em; padding: 12px; margin-bottom: 15px; }
 
-    /* Modal Fullscreen Styling */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 1000; padding: 30px; box-sizing: border-box; overflow-y: auto; }
-    .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 1200px; margin: 0 auto; border: 1px solid var(--border); }
+    /* Timeline Orizzontale */
+    .timeline-container { background: #2a2a2a; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: nowrap; min-height: 120px; display: flex; gap: 10px; align-items: center; }
+    .timeline-block { display: inline-block; background: #333; border-top: 4px solid var(--accent); padding: 10px; border-radius: 4px; min-width: 200px; vertical-align: top; white-space: normal; }
+
+    /* Modal Fullscreen */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+    .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 1000px; margin: 0 auto; border: 1px solid var(--border); }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
-    .close-btn { background: #dc3545; padding: 6px 12px; }
-    .upload-box { background: #252525; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
-    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
-    .asset-card { background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; transition: transform 0.1s; }
-    .asset-card:hover { border-color: var(--accent); transform: scale(1.03); }
-    .asset-card img { max-width: 100%; height: 100px; object-fit: contain; }
-    .asset-card span { display: block; font-size: 0.8em; margin-top: 8px; word-break: break-all; }
+    .close-btn { background: #dc3545; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 15px; }
+    .asset-card { background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; }
+    .asset-card:hover { border-color: var(--accent); }
+    .asset-card img { max-width: 100%; height: 90px; object-fit: contain; pointer-events: none; }
+    
+    /* Preview Canvas */
+    #preview-canvas { background: #000; display: block; margin: 0 auto; border: 2px solid #555; }
   </style>
 </head>
 <body>
 
-  <h1>Cutscene Studio</h1>
+  <h1>Cutscene Studio Studio Pro</h1>
+
+  <button class="btn-preview" onclick="openPreview()">▶ ANTEPRIMA CUTSCENE (Simula GitHub1)</button>
 
   <div class="grid">
     <div>
@@ -55,13 +61,18 @@
         </div>
 
         <div class="field">
-          <label>Personaggio Principale:</label>
-          <button class="btn-select" id="lbl-hero" onclick="openPicker('hero')">📁 Seleziona Personaggio...</button>
+          <label>Posa Personaggio Principale (Admin/Fallback):</label>
+          <select id="hero-pose">
+            <option value="standing">standing</option>
+            <option value="left">left</option>
+            <option value="right">right</option>
+            <option value="back">back</option>
+          </select>
         </div>
 
         <div class="field">
           <label>PNG / NPC:</label>
-          <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona PNG...</button>
+          <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona o Carica NPC...</button>
         </div>
 
         <div class="field">
@@ -71,47 +82,91 @@
       </div>
 
       <div class="panel">
-        <h3>2. Aggiungi Dialogo</h3>
+        <h3>2. Aggiungi Evento in Timeline</h3>
         <div class="field">
-          <label>Chi Parla:</label>
-          <select id="dialogue-speaker">
-            <option value="main_character">Personaggio Principale</option>
-            <option value="png">PNG / NPC</option>
-            <option value="companion">Companion</option>
+          <label>Tipo Evento:</label>
+          <select id="event-type" onchange="toggleEventFields()">
+            <option value="dialogue">Dialogo</option>
+            <option value="move">Movimento Personaggio</option>
           </select>
         </div>
-        <div class="field">
-          <label>Testo Dialogo:</label>
-          <input type="text" id="dialogue-text" placeholder="Scrivi il testo...">
+
+        <div id="field-dialogue">
+          <div class="field">
+            <label>Chi Parla:</label>
+            <select id="dialogue-speaker">
+              <option value="main_character">Personaggio Principale</option>
+              <option value="png">PNG / NPC</option>
+              <option value="companion">Companion</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Testo Dialogo:</label>
+            <input type="text" id="dialogue-text" placeholder="Scrivi il testo...">
+          </div>
         </div>
-        <button class="btn-success" onclick="addDialogue()">+ Aggiungi a Timeline</button>
+
+        <div id="field-move" style="display:none;">
+          <div class="field">
+            <label>Chi si muove:</label>
+            <select id="move-actor">
+              <option value="main_character">Personaggio Principale</option>
+              <option value="png">PNG / NPC</option>
+              <option value="companion">Companion</option>
+            </select>
+          </div>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="move-x1" placeholder="Start X">
+            <input type="number" id="move-y1" placeholder="Start Y">
+          </div>
+          <div style="display:flex; gap:5px; margin-top:5px;">
+            <input type="number" id="move-x2" placeholder="End X">
+            <input type="number" id="move-y2" placeholder="End Y">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Durata (secondi):</label>
+          <input type="number" id="event-duration" value="3" step="0.5">
+        </div>
+
+        <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline</button>
       </div>
     </div>
 
     <div>
       <div class="panel">
-        <h3>Timeline Sequenza (Trascina per riordinare)</h3>
-        <div id="timeline-track" class="track"></div>
-        <button class="btn-warning" onclick="exportJSON()">💾 Scarica Cutscene JSON</button>
+        <h3>Timeline Sequenza (Da Sinistra a Destra)</h3>
+        <div id="timeline-track" class="timeline-container"></div>
+        <br>
+        <button class="btn-warning" style="width:100%" onclick="exportJSON()">💾 Scarica Cutscene JSON</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL SELEZIONE VISUALE -->
+  <!-- MODAL PICKER & UPLOAD -->
   <div id="picker-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="modal-title">Seleziona Asset</h2>
+        <h2 id="modal-title">Gestione Asset</h2>
         <button class="close-btn" onclick="closePicker()">Chiudi ✖</button>
       </div>
 
-      <div class="upload-box">
-        <label>Carica nuovi file qui:</label>
-        <input type="file" id="modal-file-input">
-        <button onclick="uploadFromModal()">Carica Asset</button>
-      </div>
+      <div id="modal-upload-area" style="background:#252525; padding:15px; border-radius:6px; margin-bottom:15px;"></div>
 
       <div id="asset-container" class="asset-grid"></div>
+    </div>
+  </div>
+
+  <!-- MODAL ANTEPRIMA CANVAS -->
+  <div id="preview-modal" class="modal">
+    <div class="modal-content" style="text-align:center;">
+      <div class="modal-header">
+        <h2>Simulatore Anteprima Cutscene (GitHub1)</h2>
+        <button class="close-btn" onclick="closePreview()">Chiudi ✖</button>
+      </div>
+      <canvas id="preview-canvas" width="800" height="450"></canvas>
+      <div id="preview-dialogue" style="margin-top:15px; font-size:1.2em; min-height:40px; background:#222; padding:10px;"></div>
     </div>
   </div>
 
@@ -120,116 +175,190 @@
     const SUPABASE_KEY = "sb_publishable_3JHORvzXFoBh7XVVuSqgTg__ezQdQMa";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const selections = { background: '', music: '', hero: '', npc: '', companion: '' };
+    const selections = { background: '', music: '', npc: '', companion: '' };
     const timeline = [];
     let currentCategory = '';
 
-    const paths = {
-      background: 'background/trama1/',
-      music: 'music/',
-      hero: 'sprite/personaggioprincipale/',
-      npc: 'sprite/png/',
-      companion: 'sprite/companion/'
-    };
+    function toggleEventFields() {
+      const type = document.getElementById('event-type').value;
+      document.getElementById('field-dialogue').style.display = type === 'dialogue' ? 'block' : 'none';
+      document.getElementById('field-move').style.display = type === 'move' ? 'block' : 'none';
+    }
 
     async function openPicker(category) {
       currentCategory = category;
-      document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
+      document.getElementById('modal-title').innerText = `Gestione ${category.toUpperCase()}`;
       document.getElementById('picker-modal').style.display = 'block';
+      setupUploadArea();
       await loadPickerItems();
     }
 
-    function closePicker() {
-      document.getElementById('picker-modal').style.display = 'none';
+    function closePicker() { document.getElementById('picker-modal').style.display = 'none'; }
+
+    function setupUploadArea() {
+      const area = document.getElementById('modal-upload-area');
+      if (currentCategory === 'background') {
+        area.innerHTML = `
+          <h4>Carica Sfondi (Multiplo)</h4>
+          <label>Seleziona o crea Trama:</label>
+          <select id="bg-trama-select"><option value="trama1">trama1</option><option value="trama2">trama2</option></select>
+          <input type="text" id="bg-trama-custom" placeholder="Oppure nome Nuova Trama...">
+          <br><br>
+          <input type="file" id="upload-files" multiple accept="image/*">
+          <button onclick="uploadBackgrounds()">Carica Sfondi</button>
+        `;
+      } else if (currentCategory === 'npc') {
+        area.innerHTML = `
+          <h4>Carica Nuovo NPC (Richiede 4 File: standing, left, right, back)</h4>
+          <input type="text" id="npc-name" placeholder="Nome NPC (es: rosso)">
+          <input type="file" id="upload-files" multiple accept="image/*">
+          <button onclick="uploadNPC()">Carica NPC</button>
+        `;
+      } else {
+        area.innerHTML = `
+          <h4>Carica File (Multiplo)</h4>
+          <input type="file" id="upload-files" multiple>
+          <button onclick="uploadGeneric()">Carica Assets</button>
+        `;
+      }
     }
 
     async function loadPickerItems() {
       const container = document.getElementById('asset-container');
-      container.innerHTML = 'Caricamento...';
+      container.innerHTML = 'Caricamento in corso...';
       
-      const folderPath = paths[currentCategory];
-      const { data, error } = await _supabase.storage.from('assets').list(folderPath);
+      let folderPath = 'music/';
+      if (currentCategory === 'background') folderPath = 'background/';
+      if (currentCategory === 'npc') folderPath = 'sprite/png/';
+      if (currentCategory === 'companion') folderPath = 'sprite/companion/';
 
-      if (error || !data) {
-        container.innerHTML = 'Nessun asset trovato.';
-        return;
-      }
+      const { data, error } = await _supabase.storage.from('assets').list(folderPath, { limit: 100 });
+      if (error || !data) { container.innerHTML = 'Nessun asset trovato.'; return; }
 
       container.innerHTML = '';
-      data.forEach(item => {
-        if (item.name === '.emptyFolderPlaceholder') return;
 
-        const fullPath = `${folderPath}${item.name}`;
-        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
-
-        const card = document.createElement('div');
-        card.className = 'asset-card';
-
-        if (currentCategory === 'music') {
-          card.innerHTML = `🎵 <span>${item.name}</span>`;
-        } else {
-          card.innerHTML = `<img src="${publicUrl}" alt="${item.name}"><span>${item.name}</span>`;
+      if (currentCategory === 'background' || currentCategory === 'npc') {
+        for (const item of data) {
+          if (!item.id) { // Cartella
+            const subPath = `${folderPath}${item.name}/`;
+            const { data: subFiles } = await _supabase.storage.from('assets').list(subPath);
+            if (subFiles) {
+              subFiles.forEach(file => {
+                const fullPath = `${subPath}${file.name}`;
+                createCard(container, fullPath, `${item.name}/${file.name}`);
+              });
+            }
+          }
         }
-
-        card.onclick = () => selectAsset(fullPath, item.name);
-        container.appendChild(card);
-      });
-    }
-
-    function selectAsset(fullPath, name) {
-      selections[currentCategory] = fullPath;
-      document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${name}`;
-      closePicker();
-    }
-
-    async function uploadFromModal() {
-      const fileInput = document.getElementById('modal-file-input');
-      const file = fileInput.files[0];
-      if (!file) return alert("Seleziona prima un file!");
-
-      const folderPath = paths[currentCategory];
-      const fullPath = `${folderPath}${file.name}`;
-
-      const { error } = await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
-
-      if (error) alert("Errore upload: " + error.message);
-      else {
-        alert("Caricato con successo!");
-        fileInput.value = '';
-        loadPickerItems();
+      } else {
+        data.forEach(item => {
+          const fullPath = `${folderPath}${item.name}`;
+          createCard(container, fullPath, item.name);
+        });
       }
     }
 
-    function addDialogue() {
-      const speaker = document.getElementById('dialogue-speaker').value;
-      const text = document.getElementById('dialogue-text').value.trim();
-      if (!text) return alert("Inserisci un testo!");
+    function createCard(container, fullPath, displayName) {
+      const card = document.createElement('div');
+      card.className = 'asset-card';
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
 
-      timeline.push({ type: 'dialogue', speaker, text });
-      document.getElementById('dialogue-text').value = '';
+      if (currentCategory === 'music') {
+        card.innerHTML = `🎵<br><span>${displayName}</span>`;
+      } else {
+        card.innerHTML = `<img src="${publicUrl}"><br><span>${displayName}</span>`;
+      }
+
+      card.onclick = () => {
+        selections[currentCategory] = fullPath;
+        document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${displayName}`;
+        closePicker();
+      };
+      container.appendChild(card);
+    }
+
+    // UPLOAD LOGIC
+    async function uploadBackgrounds() {
+      const files = document.getElementById('upload-files').files;
+      const customTrama = document.getElementById('bg-trama-custom').value.trim();
+      const selectTrama = document.getElementById('bg-trama-select').value;
+      const trama = customTrama || selectTrama;
+
+      if (!files.length) return alert("Seleziona almeno un file!");
+
+      for (const file of files) {
+        const fullPath = `background/${trama}/${file.name}`;
+        await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
+      }
+      alert("Sfondi caricati con successo!");
+      loadPickerItems();
+    }
+
+    async function uploadNPC() {
+      const name = document.getElementById('npc-name').value.trim();
+      const files = document.getElementById('upload-files').files;
+
+      if (!name || files.length < 4) return alert("Inserisci il nome NPC e carica 4 file!");
+
+      const folderPath = `sprite/png/${name}/`;
+      const { data: existing } = await _supabase.storage.from('assets').list(folderPath);
+
+      if (existing && existing.length > 0) {
+        const overwrite = confirm(`La cartella NPC "${name}" esiste già. Vuoi sovrascrivere i file?`);
+        if (!overwrite) return;
+      }
+
+      for (const file of files) {
+        const fullPath = `${folderPath}${file.name}`;
+        await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
+      }
+      alert("NPC caricato correttamente!");
+      loadPickerItems();
+    }
+
+    async function uploadGeneric() {
+      const files = document.getElementById('upload-files').files;
+      let path = currentCategory === 'music' ? 'music/' : 'sprite/companion/';
+
+      for (const file of files) {
+        await _supabase.storage.from('assets').upload(`${path}${file.name}`, file, { upsert: true });
+      }
+      alert("Upload completato!");
+      loadPickerItems();
+    }
+
+    // TIMELINE LOGIC
+    function addTimelineEvent() {
+      const type = document.getElementById('event-type').value;
+      const duration = parseFloat(document.getElementById('event-duration').value);
+
+      let eventData = { type, duration };
+
+      if (type === 'dialogue') {
+        eventData.speaker = document.getElementById('dialogue-speaker').value;
+        eventData.text = document.getElementById('dialogue-text').value;
+      } else {
+        eventData.actor = document.getElementById('move-actor').value;
+        eventData.from = [parseInt(document.getElementById('move-x1').value || 0), parseInt(document.getElementById('move-y1').value || 0)];
+        eventData.to = [parseInt(document.getElementById('move-x2').value || 0), parseInt(document.getElementById('move-y2').value || 0)];
+      }
+
+      timeline.push(eventData);
       renderTimeline();
     }
 
     function renderTimeline() {
-      const container = document.getElementById('timeline-track');
-      container.innerHTML = '';
+      const track = document.getElementById('timeline-track');
+      track.innerHTML = '';
+
       timeline.forEach((item, index) => {
-        const div = document.createElement('div');
-        div.className = 'block';
-        div.draggable = true;
-        div.innerHTML = `<span><b>${index + 1}.</b> [${item.speaker}]: "${item.text}"</span>`;
-
-        div.ondragstart = (e) => e.dataTransfer.setData('text/plain', index);
-        div.ondragover = (e) => e.preventDefault();
-        div.ondrop = (e) => {
-          e.preventDefault();
-          const fromIndex = e.dataTransfer.getData('text/plain');
-          const moved = timeline.splice(fromIndex, 1)[0];
-          timeline.splice(index, 0, moved);
-          renderTimeline();
-        };
-
-        container.appendChild(div);
+        const block = document.createElement('div');
+        block.className = 'timeline-block';
+        block.innerHTML = `
+          <b>#${index + 1} [${item.type}]</b> (${item.duration}s)<br>
+          ${item.type === 'dialogue' ? `${item.speaker}: "${item.text}"` : `Move ${item.actor}`}
+        `;
+        track.appendChild(block);
       });
     }
 
@@ -237,21 +366,13 @@
       const output = {
         setup: {
           background: selections.background || "background/trama1/fallback.png",
-          background_fallback: "background/trama1/fallback.png",
           music: selections.music || "music/fallback.mp3",
-          music_fallback: "music/fallback.mp3",
           main_character: {
-            folder: selections.hero || "sprite/personaggioprincipale/fallback/",
+            pose: document.getElementById('hero-pose').value,
             fallback_folder: "sprite/personaggioprincipale/fallback/"
           },
-          png: {
-            folder: selections.npc || "sprite/png/default/",
-            fallback_folder: "sprite/png/default/"
-          },
-          companion: {
-            folder: selections.companion || "sprite/companion/fallback/",
-            fallback_folder: "sprite/companion/fallback/"
-          }
+          png: { folder: selections.npc || "sprite/png/default/" },
+          companion: { folder: selections.companion || "sprite/companion/fallback/" }
         },
         timeline: timeline
       };
@@ -262,6 +383,40 @@
       a.download = "cutscene_daily.json";
       a.click();
     }
+
+    // PREVIEW CANVAS SIMULATOR (SIMULA GITHUB1)
+    function openPreview() {
+      document.getElementById('preview-modal').style.display = 'block';
+      const canvas = document.getElementById('preview-canvas');
+      const ctx = canvas.getContext('2d');
+      const dialogBox = document.getElementById('preview-dialogue');
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      let step = 0;
+      function playNext() {
+        if (step >= timeline.length) {
+          dialogBox.innerText = "FINE CUTSCENE - Apertura Bustina!";
+          return;
+        }
+
+        const ev = timeline[step];
+        if (ev.type === 'dialogue') {
+          dialogBox.innerText = `[${ev.speaker}]: ${ev.text}`;
+        } else {
+          dialogBox.innerText = `[Movimento ${ev.actor} da ${ev.from} a ${ev.to}]`;
+        }
+
+        step++;
+        setTimeout(playNext, ev.duration * 1000);
+      }
+
+      playNext();
+    }
+
+    function closePreview() { document.getElementById('preview-modal').style.display = 'none'; }
   </script>
 </body>
 </html>
