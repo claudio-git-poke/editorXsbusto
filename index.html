@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cutscene Studio Pro</title>
+  <title>Cutscene Studio Pro (16:9)</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --bg: #0f111a; --panel: #1a1d2d; --accent: #7c3aed; --border: #2e334d; --text: #f3f4f6; }
     body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 20px; }
-    h1, h3 { margin-top: 0; color: #fff; }
+    h1, h3, h4 { margin-top: 0; color: #fff; }
     .grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
     .panel { background: var(--panel); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
     .field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
@@ -21,10 +21,35 @@
 
     #auth-screen { max-width: 400px; margin: 80px auto; }
     
-    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; }
-    .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: transform 0.05s linear; }
+    /* STAGE CON DIMENSIONI NATIVE 16:9 (480x270 px) */
+    .stage-container { 
+      position: relative; 
+      width: 480px; 
+      height: 270px; 
+      background: #000; 
+      border: 2px solid var(--border); 
+      border-radius: 8px; 
+      overflow: hidden; 
+      background-size: cover; 
+      background-position: center; 
+      margin: 0 auto 20px auto; 
+    }
+    
+    .draggable-actor { 
+      position: absolute; 
+      width: 48px; 
+      height: 48px; 
+      cursor: move; 
+      user-select: none; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      z-index: 10; 
+      transition: transform 0.05s linear; 
+    }
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
-    .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; }
+    .actor-label { font-size: 8px; background: rgba(0,0,0,0.7); padding: 1px 3px; border-radius: 3px; margin-top: 1px; white-space: nowrap; }
 
     #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; pointer-events: none; }
     #dialogue-overlay .speaker { font-weight: bold; color: #f59e0b; margin-bottom: 4px; }
@@ -71,7 +96,7 @@
   </div>
 
   <div id="editor-screen" style="display:none;">
-    <h1>Cutscene Studio Pro</h1>
+    <h1>Cutscene Studio Pro (16:9)</h1>
 
     <div class="panel" style="display:flex; gap:10px;">
       <button style="background:#3b82f6;" onclick="loadCutsceneFromSupabase()">☁️ Carica da Supabase</button>
@@ -206,11 +231,10 @@
     let musicPath = '';
     
     const actorsList = [
-      { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [100, 150] }
+      { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [216, 111] }
     ];
 
     const timelineEvents = [];
-    let currentCutsceneName = "cutscene.json";
     let isPreviewRunning = false;
     let isDialogueWaiting = false;
     let clickMoveStep = 0;
@@ -268,8 +292,8 @@
 
         document.addEventListener('mousemove', (e) => {
           if (!isDragging) return;
-          const maxW = stage.clientWidth - 64;
-          const maxH = stage.clientHeight - 64;
+          const maxW = 480 - 48;
+          const maxH = 270 - 48;
           const x = Math.max(0, Math.min(maxW, e.clientX + offset[0]));
           const y = Math.max(0, Math.min(maxH, e.clientY + offset[1]));
           div.style.left = x + 'px';
@@ -350,7 +374,7 @@
             } else {
               const name = document.getElementById('new-actor-name').value;
               const behavior = document.getElementById('new-actor-behavior').value;
-              const initialPos = [200 + (actorsList.length * 40), 150];
+              const initialPos = [216 + (actorsList.length * 30), 111];
 
               const newActor = {
                 id: 'actor_' + Date.now(),
@@ -362,7 +386,7 @@
               actorsList.push(newActor);
 
               if (behavior === 'move') {
-                const endX = parseInt(document.getElementById('actor-end-x').value || initialPos[0] + 100);
+                const endX = parseInt(document.getElementById('actor-end-x').value || initialPos[0] + 50);
                 const endY = parseInt(document.getElementById('actor-end-y').value || initialPos[1]);
                 timelineEvents.push({
                   id: Date.now() + 1,
@@ -420,7 +444,6 @@
         block.style.width = `${(ev.duration / 10) * 100}%`;
         block.innerText = ev.type === 'dialogue' ? `💬 ${ev.speaker}: ${ev.text}` : `🏃 ${ev.actor}`;
         
-        // Resizer Destro (Modifica Durata)
         const resizerRight = document.createElement('div');
         resizerRight.className = 'resizer right';
         block.appendChild(resizerRight);
@@ -448,7 +471,6 @@
           document.addEventListener('mouseup', onMouseUp);
         });
 
-        // Resizer Sinistro (Modifica Inizio Start)
         const resizerLeft = document.createElement('div');
         resizerLeft.className = 'resizer left';
         block.appendChild(resizerLeft);
@@ -457,7 +479,6 @@
           e.stopPropagation();
           let startX = e.clientX;
           let initialLeft = block.offsetLeft;
-          let initialWidth = block.offsetWidth;
           let trackWidth = eventContent.offsetWidth;
 
           function onMouseMove(e) {
@@ -490,7 +511,6 @@
     function openActorInspector(actor) {
       document.getElementById('modal-title').innerText = `Gestisci Personaggio: ${actor.name}`;
       const container = document.getElementById('asset-container');
-      
       const existingMove = timelineEvents.find(e => e.type === 'move' && e.actor === actor.name);
       
       container.innerHTML = `
@@ -604,8 +624,8 @@
       if (clickMoveStep === 0) return;
 
       const rect = document.getElementById('stage').getBoundingClientRect();
-      const x = Math.round(e.clientX - rect.left - 32);
-      const y = Math.round(e.clientY - rect.top - 32);
+      const x = Math.round(e.clientX - rect.left - 24);
+      const y = Math.round(e.clientY - rect.top - 24);
 
       if (clickMoveStep === 2) {
         if (clickMoveTarget === 'new') {
@@ -689,11 +709,36 @@
     }
 
     async function saveToSupabase() {
-      let name = prompt("Nome cutscene:", currentCutsceneName);
-      if (!name) return;
-      if (!name.endsWith('.json')) name += '.json';
-      await _supabase.storage.from('assets').upload(`cutscenes/${name}`, JSON.stringify(generateJSONData()), { contentType: 'application/json', upsert: true });
-      alert("Cutscene salvata!");
+      const dayNumber = prompt("Inserisci il numero del giorno (es. 1 per giorno1.json):");
+      if (!dayNumber) return;
+
+      const fileName = `cutscenes/giorno${dayNumber.trim()}.json`;
+      const jsonContent = JSON.stringify(generateJSONData(), null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+
+      try {
+        const { error } = await _supabase.storage
+          .from('assets')
+          .upload(fileName, blob, { 
+            upsert: true,
+            cacheControl: '0'
+          });
+
+        if (error) throw error;
+        alert(`Cutscene salvata con successo come ${fileName}!`);
+      } catch(e) {
+        alert("Errore nel salvataggio: " + e.message);
+      }
+    }
+
+    function exportJSON() {
+      const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(generateJSONData(), null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", jsonString);
+      downloadAnchor.setAttribute("download", "cutscene.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
     }
 
     async function loadCutsceneFromSupabase() {
@@ -719,26 +764,26 @@
       backgroundPath = data.background || '';
       musicPath = data.music || '';
 
-      if (backgroundPath) {
-        document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
-        document.getElementById('lbl-bg').innerText = `✅ ${backgroundPath.split('/').pop()}`;
-      }
-      if (musicPath) {
-        document.getElementById('lbl-music').innerText = `✅ ${musicPath.split('/').pop()}`;
-      }
-
       if (data.actors) actorsList.push(...data.actors);
       if (data.events) timelineEvents.push(...data.events);
+
+      if (backgroundPath) {
+        document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
+        document.getElementById('lbl-bg').innerText = `✅ Sfondo caricato`;
+      } else {
+        document.getElementById('stage').style.backgroundImage = 'none';
+        document.getElementById('lbl-bg').innerText = `📁 Seleziona Sfondo...`;
+      }
+
+      if (musicPath) {
+        document.getElementById('lbl-music').innerText = `✅ Musica caricata`;
+      } else {
+        document.getElementById('lbl-music').innerText = `📁 Seleziona Musica...`;
+      }
+
       renderStageActors();
       renderTimeline();
       updateDropdownOptions();
-    }
-
-    function exportJSON() {
-      const a = document.createElement('a');
-      a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(generateJSONData(), null, 2));
-      a.download = currentCutsceneName;
-      a.click();
     }
   </script>
 </body>
