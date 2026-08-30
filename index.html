@@ -21,12 +21,12 @@
 
     #auth-screen { max-width: 400px; margin: 80px auto; }
     
-    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; }
+    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; cursor: pointer; }
     .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; }
 
-    #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; cursor: pointer; }
+    #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; pointer-events: none; }
     #dialogue-overlay .speaker { font-weight: bold; color: #f59e0b; margin-bottom: 4px; }
     #dialogue-overlay .click-hint { font-size: 10px; color: #aaa; text-align: right; margin-top: 5px; }
 
@@ -39,10 +39,14 @@
     .ruler-mark { flex: 1; border-left: 1px solid #2e334d; padding-left: 4px; min-width: 60px; }
     .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 90px; position: relative; width: 100%; }
     .track-row { position: relative; height: 36px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; }
-    .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: grab; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
-    .timeline-block:active { cursor: grabbing; opacity: 0.8; }
+    
+    .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 2px 12px 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: grab; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+    .timeline-block:active { cursor: grabbing; }
     .timeline-block.dialogue { background: #f59e0b; }
     .timeline-block.move { background: #3b82f6; }
+    
+    /* BORDO PER RESIZE TIMELINE */
+    .resizer-right { position: absolute; right: 0; top: 0; width: 8px; height: 100%; cursor: e-resize; background: rgba(255,255,255,0.3); border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
     .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 900px; margin: 0 auto; border: 1px solid var(--border); }
@@ -180,7 +184,7 @@
       </div>
 
       <div>
-        <div id="stage" class="stage-container" onclick="handleStageClick(event)">
+        <div id="stage" class="stage-container" onclick="handleStageGlobalClick(event)">
           <div id="actor-hero" class="draggable-actor" style="left: 100px; top: 150px;">
             <img id="img-hero" src="">
             <div class="actor-label">Hero</div>
@@ -194,10 +198,10 @@
             <div class="actor-label">Companion</div>
           </div>
 
-          <div id="dialogue-overlay" onclick="advanceDialogue()">
+          <div id="dialogue-overlay">
             <div class="speaker" id="dialogue-speaker-name">Speaker</div>
             <div class="text" id="dialogue-text-content">...</div>
-            <div class="click-hint">Clicca qui per continuare ➔</div>
+            <div class="click-hint">Clicca in un punto qualsiasi per continuare ➔</div>
           </div>
         </div>
 
@@ -252,7 +256,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const selections = { background: '', music: '', npcFolder: '', companion: '' };
-    const positions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
+    const initialPositions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
     const timeline = [];
     let currentCategory = '';
     let isPreviewRunning = false;
@@ -270,6 +274,7 @@
         document.getElementById('user-info').innerText = `Sei già loggato come: ${session.user.email}`;
       }
       loadHeroFallback();
+      setupActorDrags();
     };
 
     async function login() {
@@ -294,7 +299,30 @@
       document.getElementById('img-hero').src = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/${pose}.png`;
     }
 
-    // ASSET PICKER & DIRECT UPLOAD FIX
+    // MEMORIZZA POSIZIONE INIZIALE TRAMITE DRAG DEGLI ATTORI
+    function setupActorDrags() {
+      document.querySelectorAll('.draggable-actor').forEach(actor => {
+        let isDragging = false, offset = [0, 0];
+        actor.addEventListener('mousedown', (e) => {
+          if (isPreviewRunning || clickMoveStep !== 0) return;
+          isDragging = true;
+          offset = [actor.offsetLeft - e.clientX, actor.offsetTop - e.clientY];
+        });
+        document.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          const x = Math.max(0, Math.min(736, e.clientX + offset[0]));
+          const y = Math.max(0, Math.min(296, e.clientY + offset[1]));
+          actor.style.left = x + 'px';
+          actor.style.top = y + 'px';
+
+          const key = actor.id === 'actor-hero' ? 'main_character' : (actor.id === 'actor-npc' ? 'png' : 'companion');
+          initialPositions[key] = [x, y];
+        });
+        document.addEventListener('mouseup', () => isDragging = false);
+      });
+    }
+
+    // CARICAMENTO ED ESPLORAZIONE CARTELLE ASSET (BG, PNG, MUSIC, COMPANION)
     async function openPicker(category) {
       currentCategory = category;
       document.getElementById('modal-title').innerText = `Gestione ${category.toUpperCase()}`;
@@ -316,77 +344,83 @@
 
     async function uploadNewAsset() {
       const fileInput = document.getElementById('upload-file-input');
-      if (!fileInput.files.length) return alert("Seleziona almeno un file!");
+      if (!fileInput.files.length) return alert("Seleziona un file!");
 
-      let targetFolder = '';
-      if (currentCategory === 'background') targetFolder = 'background';
-      else if (currentCategory === 'music') targetFolder = 'music';
-      else if (currentCategory === 'npc') targetFolder = 'sprite/png';
-      else if (currentCategory === 'companion') targetFolder = 'sprite/companion';
-      else if (currentCategory === 'fallback_hero') targetFolder = 'sprite/personaggioprincipale/fallback';
+      let targetFolder = currentCategory === 'background' ? 'background' : 
+                         (currentCategory === 'music' ? 'music' : 
+                         (currentCategory === 'npc' ? 'sprite/png' : 
+                         (currentCategory === 'companion' ? 'sprite/companion' : 'sprite/personaggioprincipale/fallback')));
 
       for (const file of fileInput.files) {
-        const filePath = `${targetFolder}/${file.name}`;
-        await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+        await _supabase.storage.from('assets').upload(`${targetFolder}/${file.name}`, file, { upsert: true });
       }
 
-      alert("Upload completato con successo!");
+      alert("Upload completato!");
       await loadPickerItems();
     }
 
-    async function loadPickerItems() {
+    async function loadPickerItems(subFolder = '') {
       const container = document.getElementById('asset-container');
       container.innerHTML = 'Caricamento...';
 
-      let fetchPath = '';
-      if (currentCategory === 'background') fetchPath = 'background';
-      else if (currentCategory === 'music') fetchPath = 'music';
-      else if (currentCategory === 'npc') fetchPath = 'sprite/png';
-      else if (currentCategory === 'companion') fetchPath = 'sprite/companion';
-      else if (currentCategory === 'fallback_hero') fetchPath = 'sprite/personaggioprincipale/fallback';
+      let fetchPath = currentCategory === 'background' ? 'background' : 
+                       (currentCategory === 'music' ? 'music' : 
+                       (currentCategory === 'npc' ? 'sprite/png' : 'sprite/companion'));
+
+      if (subFolder) fetchPath += `/${subFolder}`;
 
       const { data } = await _supabase.storage.from('assets').list(fetchPath);
       container.innerHTML = '';
 
-      data?.forEach(f => {
-        const fullPath = `${fetchPath}/${f.name}`;
+      data?.forEach(item => {
+        const fullPath = `${fetchPath}/${item.name}`;
         const card = document.createElement('div');
         card.className = 'asset-card';
 
-        if (currentCategory === 'music') {
-          card.innerHTML = `🎵<br><span style="font-size:11px;">${f.name}</span>`;
+        // SE È UNA CARTELLA
+        if (!item.id) {
+          card.innerHTML = `📁<br><span style="font-size:11px; font-weight:bold;">${item.name}</span>`;
+          card.onclick = () => loadPickerItems(item.name);
         } else {
-          card.innerHTML = `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><br><span style="font-size:11px;">${f.name}</span>`;
-        }
-
-        card.onclick = () => {
-          selections[currentCategory] = fullPath;
-          const lbl = document.getElementById(`lbl-${currentCategory}`);
-          if (lbl) lbl.innerText = `✅ ${f.name}`;
-
-          if (currentCategory === 'background') {
-            document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath})`;
-          } else if (currentCategory === 'npc') {
-            document.getElementById('actor-npc').style.display = 'flex';
-            document.getElementById('img-npc').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
-          } else if (currentCategory === 'companion') {
-            document.getElementById('actor-companion').style.display = 'flex';
-            document.getElementById('img-companion').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+          if (currentCategory === 'music') {
+            card.innerHTML = `🎵<br><span style="font-size:11px;">${item.name}</span>`;
+          } else {
+            card.innerHTML = `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><br><span style="font-size:11px;">${item.name}</span>`;
           }
-          closePicker();
-        };
 
+          card.onclick = () => {
+            selections[currentCategory] = fullPath;
+            const lbl = document.getElementById(`lbl-${currentCategory}`);
+            if (lbl) lbl.innerText = `✅ ${item.name}`;
+
+            if (currentCategory === 'background') {
+              document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath})`;
+            } else if (currentCategory === 'npc') {
+              document.getElementById('actor-npc').style.display = 'flex';
+              document.getElementById('img-npc').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+            } else if (currentCategory === 'companion') {
+              document.getElementById('actor-companion').style.display = 'flex';
+              document.getElementById('img-companion').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+            }
+            closePicker();
+          };
+        }
         container.appendChild(card);
       });
     }
 
-    // CLICK STAGE MOVEMENT
+    // MOVIEMNTO REGISTRATO VIA CLICK SU STAGE
     function startClickMovement() {
       clickMoveStep = 1;
       alert("Clicca sullo Stage per la POSIZIONE DI PARTENZA");
     }
 
-    function handleStageClick(e) {
+    function handleStageGlobalClick(e) {
+      if (isDialogueWaiting) {
+        advanceDialogue();
+        return;
+      }
+
       if (clickMoveStep === 0) return;
       const rect = document.getElementById('stage').getBoundingClientRect();
       const x = Math.round(e.clientX - rect.left - 32);
@@ -405,7 +439,7 @@
       }
     }
 
-    // TIMELINE SYSTEM & DRAG AND DROP
+    // TIMELINE MULTI-TRACK, DRAG & RESIZE BORD
     function toggleEventInputs() {
       const type = document.getElementById('event-type').value;
       document.getElementById('dialogue-fields').style.display = type === 'dialogue' ? 'block' : 'none';
@@ -451,35 +485,57 @@
         block.style.width = `${widthPct}%`;
         block.innerText = item.type === 'dialogue' ? `💬 ${item.speaker}: ${item.text}` : `🏃 ${item.actor}`;
 
-        // DRAG & DROP ON TIMELINE
+        // ELEMENTO PER RESIZE BORDO
+        const resizer = document.createElement('div');
+        resizer.className = 'resizer-right';
+        block.appendChild(resizer);
+
         let isDraggingBlock = false;
+        let isResizing = false;
         let startX = 0;
         let initialStart = item.start;
+        let initialDuration = item.duration;
 
+        // DRAG SPO SPOSTAMENTO TEMPO INIZIO
         block.addEventListener('mousedown', (e) => {
+          if (e.target === resizer) return;
           e.stopPropagation();
           isDraggingBlock = true;
           startX = e.clientX;
           initialStart = item.start;
         });
 
+        // RESIZE DURATA TRASCINANDO IL BORDO
+        resizer.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          isResizing = true;
+          startX = e.clientX;
+          initialDuration = item.duration;
+        });
+
         document.addEventListener('mousemove', (e) => {
-          if (!isDraggingBlock) return;
-          const deltaX = e.clientX - startX;
-          const deltaSec = (deltaX / wrapperWidth) * 10;
-          let newStart = Math.max(0, Math.min(10 - item.duration, initialStart + deltaSec));
-          item.start = Math.round(newStart * 10) / 10;
-          block.style.left = `${(item.start / 10) * 100}%`;
+          if (isDraggingBlock) {
+            const deltaSec = ((e.clientX - startX) / wrapperWidth) * 10;
+            let newStart = Math.max(0, Math.min(10 - item.duration, initialStart + deltaSec));
+            item.start = Math.round(newStart * 10) / 10;
+            block.style.left = `${(item.start / 10) * 100}%`;
+          } else if (isResizing) {
+            const deltaSec = ((e.clientX - startX) / wrapperWidth) * 10;
+            let newDuration = Math.max(0.5, Math.min(10 - item.start, initialDuration + deltaSec));
+            item.duration = Math.round(newDuration * 10) / 10;
+            block.style.width = `${(item.duration / 10) * 100}%`;
+          }
         });
 
         document.addEventListener('mouseup', () => {
-          if (isDraggingBlock) {
+          if (isDraggingBlock || isResizing) {
             isDraggingBlock = false;
+            isResizing = false;
             renderTimeline();
           }
         });
 
-        // EDIT PROPERTIES ON CLICK
+        // APRI DETTAGLI E MODIFICA SU CLICK SUL BLOCCO
         block.addEventListener('click', (e) => {
           e.stopPropagation();
           openInspector(item);
@@ -492,7 +548,7 @@
 
     function openInspector(item) {
       const modal = document.getElementById('picker-modal');
-      document.getElementById('modal-title').innerText = `Proprietà Evento (#${item.id})`;
+      document.getElementById('modal-title').innerText = `Modifica Evento (${item.type.toUpperCase()})`;
       document.getElementById('modal-upload-area').innerHTML = '';
       
       const container = document.getElementById('asset-container');
@@ -507,6 +563,14 @@
             <input type="number" id="edit-duration" value="${item.duration}" step="0.1">
           </div>
           ${item.type === 'dialogue' ? `
+            <div class="field">
+              <label>Chi Parla:</label>
+              <select id="edit-speaker">
+                <option value="main_character" ${item.speaker === 'main_character' ? 'selected' : ''}>Personaggio Principale</option>
+                <option value="png" ${item.speaker === 'png' ? 'selected' : ''}>PNG / NPC</option>
+                <option value="companion" ${item.speaker === 'companion' ? 'selected' : ''}>Companion</option>
+              </select>
+            </div>
             <div class="field">
               <label>Testo Dialogo:</label>
               <input type="text" id="edit-text" value="${item.text}">
@@ -537,6 +601,7 @@
       item.duration = parseFloat(document.getElementById('edit-duration').value);
 
       if (item.type === 'dialogue') {
+        item.speaker = document.getElementById('edit-speaker').value;
         item.text = document.getElementById('edit-text').value;
       } else {
         item.from = document.getElementById('edit-from').value.split(',').map(Number);
@@ -553,15 +618,23 @@
       closePicker();
     }
 
-    // AUDIO & PREVIEW FIX
+    // ANTEPRIMA & FIX RIPRODUZIONE AUDIO MUSICA
     function startPreview() {
       stopPreview();
       isPreviewRunning = true;
 
+      // Ripristina posizioni attori decise dall'utente
+      document.getElementById('actor-hero').style.left = `${initialPositions.main_character[0]}px`;
+      document.getElementById('actor-hero').style.top = `${initialPositions.main_character[1]}px`;
+      document.getElementById('actor-npc').style.left = `${initialPositions.png[0]}px`;
+      document.getElementById('actor-npc').style.top = `${initialPositions.png[1]}px`;
+      document.getElementById('actor-companion').style.left = `${initialPositions.companion[0]}px`;
+      document.getElementById('actor-companion').style.top = `${initialPositions.companion[1]}px`;
+
       if (selections.music) {
         bgAudio.src = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
         bgAudio.loop = true;
-        bgAudio.play().catch(e => console.log("Audio play error:", e));
+        bgAudio.play().catch(e => console.log("Audio play allowed on user click:", e));
       }
 
       let currentTime = 0;
@@ -569,7 +642,7 @@
 
       previewTimer = setInterval(() => {
         if (!isPreviewRunning) return;
-        if (isDialogueWaiting) return; // BLOCCO TOTALE DELLA SCENA
+        if (isDialogueWaiting) return;
 
         timeline.forEach(ev => {
           if (!triggeredEvents.has(ev.id) && currentTime >= ev.start) {
@@ -598,7 +671,7 @@
 
     function advanceDialogue() {
       document.getElementById('dialogue-overlay').style.display = 'none';
-      isDialogueWaiting = false; // SBLOCCA LA SCENA
+      isDialogueWaiting = false;
     }
 
     function animateActorMove(ev) {
@@ -626,7 +699,7 @@
       document.getElementById('dialogue-overlay').style.display = 'none';
     }
 
-    // SUPABASE IMPORT/EXPORT
+    // IMPORTO / ESPORTO SUPABASE JSON
     async function saveToSupabase() {
       let name = prompt("Nome cutscene su Supabase:", currentCutsceneName);
       if (!name) return;
@@ -679,9 +752,9 @@
         setup: {
           background: selections.background || "background/fallback.png",
           music: selections.music || "music/fallback.mp3",
-          main_character: { pose: document.getElementById('hero-pose').value, initial_position: positions.main_character },
-          png: { folder: selections.npcFolder, initial_position: positions.png },
-          companion: { folder: selections.companion, initial_position: positions.companion }
+          main_character: { pose: document.getElementById('hero-pose').value, initial_position: initialPositions.main_character },
+          png: { folder: selections.npcFolder, initial_position: initialPositions.png },
+          companion: { folder: selections.companion, initial_position: initialPositions.companion }
         },
         timeline: timeline
       };
