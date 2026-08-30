@@ -133,22 +133,6 @@
             <input type="text" id="new-actor-name" placeholder="Es. Guardia 1, Companion Rex...">
           </div>
 
-          <div class="field">
-            <label>Comportamento Iniziale:</label>
-            <select id="new-actor-behavior" onchange="toggleActorBehaviorInputs()">
-              <option value="static">Resta Fermo</option>
-              <option value="move">Muoviti</option>
-            </select>
-          </div>
-
-          <div id="actor-move-inputs" style="display:none;">
-            <button type="button" style="background:#8b5cf6; margin-bottom:8px; width:100%;" onclick="startClickMovement(true)">🖱 Seleziona Posizione Finale su Stage</button>
-            <div style="display:flex; gap:5px;">
-              <input type="number" id="actor-end-x" placeholder="Destinazione X">
-              <input type="number" id="actor-end-y" placeholder="Destinazione Y">
-            </div>
-          </div>
-
           <button class="btn-select" style="margin-top:10px;" id="lbl-new-actor-asset" onclick="openPickerForNewActor()">📁 Scegli Asset e Aggiungi ➔</button>
         </div>
 
@@ -238,8 +222,8 @@
     let timelineEvents = [];
     let isPreviewRunning = false;
     let isDialogueWaiting = false;
-    let clickMoveStep = 0;
-    let clickMoveTarget = null;
+    let clickMoveStep = 0; // 0 = disattivo, 'start' = seleziona iniziale, 'end' = seleziona finale
+    let clickMoveTargetActor = null;
     let bgAudio = new Audio();
     let previewTimer = null;
     let pendingActorAssetType = '';
@@ -283,7 +267,6 @@
       document.getElementById('editor-screen').style.display = 'block';
     }
 
-    // Funzione mancante aggiunta per risolvere l'errore in console
     async function loadCutsceneFromSupabase() {
       const dayNumber = prompt("Inserisci il numero del giorno da caricare (es. 1):");
       if (!dayNumber) return;
@@ -394,11 +377,6 @@
       });
     }
 
-    function toggleActorBehaviorInputs() {
-      const val = document.getElementById('new-actor-behavior').value;
-      document.getElementById('actor-move-inputs').style.display = val === 'move' ? 'block' : 'none';
-    }
-
     function openPickerForNewActor() {
       const name = document.getElementById('new-actor-name').value.trim();
       if (!name) return alert("Inserisci prima un nome per il personaggio!");
@@ -453,7 +431,6 @@
               document.getElementById('lbl-music').innerText = `✅ ${item.name}`;
             } else {
               const name = document.getElementById('new-actor-name').value;
-              const behavior = document.getElementById('new-actor-behavior').value;
               const initialPos = [216 + (actorsList.length * 30), 111];
 
               const newActor = {
@@ -464,20 +441,6 @@
                 pos: initialPos
               };
               actorsList.push(newActor);
-
-              if (behavior === 'move') {
-                const endX = parseInt(document.getElementById('actor-end-x').value || initialPos[0] + 50);
-                const endY = parseInt(document.getElementById('actor-end-y').value || initialPos[1]);
-                timelineEvents.push({
-                  id: Date.now() + 1,
-                  type: 'move',
-                  actor: name,
-                  from: [...initialPos],
-                  to: [endX, endY],
-                  start: 0,
-                  duration: 3
-                });
-              }
 
               renderStageActors();
               renderTimeline();
@@ -593,20 +556,28 @@
       const container = document.getElementById('asset-container');
       const existingMove = timelineEvents.find(e => e.type === 'move' && e.actor === actor.name);
       
+      const moveFrom = existingMove ? existingMove.from : [...actor.pos];
+      const moveTo = existingMove ? existingMove.to : [actor.pos[0] + 50, actor.pos[1]];
+
       container.innerHTML = `
-        <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:10px;">
+        <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:12px;">
           <div class="field"><label>Nome Personaggio:</label><input type="text" id="edit-actor-name" value="${actor.name}"></div>
           
-          <div style="display:flex; gap:10px;">
-            <div class="field" style="flex:1;"><label>Posizione Iniziale X:</label><input type="number" id="edit-actor-x" value="${actor.pos[0]}"></div>
-            <div class="field" style="flex:1;"><label>Posizione Iniziale Y:</label><input type="number" id="edit-actor-y" value="${actor.pos[1]}"></div>
+          <hr style="border-color:var(--border);">
+          <h4>Posizione Iniziale</h4>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button style="background:#8b5cf6; flex:1;" onclick="startActorClickSelect('${actor.name}', 'start')">🖱 Seleziona Posizione Iniziale con un click</button>
+            <div class="field" style="width:70px; margin:0;"><label>X</label><input type="number" id="edit-actor-x" value="${actor.pos[0]}"></div>
+            <div class="field" style="width:70px; margin:0;"><label>Y</label><input type="number" id="edit-actor-y" value="${actor.pos[1]}"></div>
           </div>
 
           <hr style="border-color:var(--border);">
-          <h4>Movimento Associato</h4>
-          <button style="background:#8b5cf6;" onclick="setupActorMovement('${actor.name}')">
-            ${existingMove ? '⚙️ Modifica Destinazione Finale' : '+ Registra Percorso di Movimento'}
-          </button>
+          <h4>Movimento / Posizione Finale</h4>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button style="background:#3b82f6; flex:1;" onclick="startActorClickSelect('${actor.name}', 'end')">🖱 Seleziona Posizione Finale con un click</button>
+            <div class="field" style="width:70px; margin:0;"><label>X</label><input type="number" id="edit-move-end-x" value="${moveTo[0]}"></div>
+            <div class="field" style="width:70px; margin:0;"><label>Y</label><input type="number" id="edit-move-end-y" value="${moveTo[1]}"></div>
+          </div>
 
           <div style="display:flex; gap:10px; margin-top:15px;">
             <button class="btn-success" onclick="saveActorInspector('${actor.id}')">Salva</button>
@@ -617,11 +588,11 @@
       document.getElementById('picker-modal').style.display = 'block';
     }
 
-    function setupActorMovement(actorName) {
+    function startActorClickSelect(actorName, mode) {
       closePicker();
-      clickMoveTarget = actorName;
-      clickMoveStep = 2;
-      alert(`Clicca sullo stage per scegliere la destinazione finale di ${actorName}`);
+      clickMoveTargetActor = actorName;
+      clickMoveStep = mode; // 'start' o 'end'
+      alert(`Clicca sullo stage per impostare la posizione ${mode === 'start' ? 'iniziale' : 'finale'} di ${actorName}`);
     }
 
     function saveActorInspector(actorId) {
@@ -630,6 +601,26 @@
         actor.name = document.getElementById('edit-actor-name').value;
         actor.pos[0] = parseInt(document.getElementById('edit-actor-x').value || 0);
         actor.pos[1] = parseInt(document.getElementById('edit-actor-y').value || 0);
+
+        let endX = parseInt(document.getElementById('edit-move-end-x').value || actor.pos[0]);
+        let endY = parseInt(document.getElementById('edit-move-end-y').value || actor.pos[1]);
+
+        let ev = timelineEvents.find(e => e.type === 'move' && e.actor === actor.name);
+        if (!ev) {
+          timelineEvents.push({
+            id: Date.now(),
+            type: 'move',
+            actor: actor.name,
+            from: [...actor.pos],
+            to: [endX, endY],
+            start: 0,
+            duration: 3
+          });
+        } else {
+          ev.from = [...actor.pos];
+          ev.to = [endX, endY];
+        }
+
         renderStageActors();
         renderTimeline();
         updateDropdownOptions();
@@ -689,12 +680,6 @@
       renderTimeline();
     }
 
-    function startClickMovement(isNewActor = false) {
-      clickMoveStep = 2;
-      clickMoveTarget = isNewActor ? 'new' : null;
-      alert("Clicca sullo stage per la Posizione di ARRIVO");
-    }
-
     function handleStageGlobalClick(e) {
       if (isDialogueWaiting) {
         document.getElementById('dialogue-overlay').style.display = 'none';
@@ -707,26 +692,33 @@
       const x = Math.round(e.clientX - rect.left - 24);
       const y = Math.round(e.clientY - rect.top - 24);
 
-      if (clickMoveStep === 2) {
-        if (clickMoveTarget === 'new') {
-          document.getElementById('actor-end-x').value = x;
-          document.getElementById('actor-end-y').value = y;
-        } else if (clickMoveTarget) {
-          const actorObj = actorsList.find(a => a.name === clickMoveTarget);
-          if (actorObj) {
-            let ev = timelineEvents.find(e => e.type === 'move' && e.actor === actorObj.name);
-            if (!ev) {
-              ev = { id: Date.now(), type: 'move', actor: actorObj.name, start: 0, duration: 3 };
-              timelineEvents.push(ev);
-            }
-            ev.from = [...actorObj.pos];
+      const actorObj = actorsList.find(a => a.name === clickMoveTargetActor);
+      if (actorObj) {
+        if (clickMoveStep === 'start') {
+          actorObj.pos = [x, y];
+          let ev = timelineEvents.find(ev => ev.type === 'move' && ev.actor === actorObj.name);
+          if (ev) ev.from = [x, y];
+        } else if (clickMoveStep === 'end') {
+          let ev = timelineEvents.find(ev => ev.type === 'move' && ev.actor === actorObj.name);
+          if (!ev) {
+            timelineEvents.push({
+              id: Date.now(),
+              type: 'move',
+              actor: actorObj.name,
+              from: [...actorObj.pos],
+              to: [x, y],
+              start: 0,
+              duration: 3
+            });
+          } else {
             ev.to = [x, y];
-            renderTimeline();
           }
         }
-        clickMoveStep = 0;
-        clickMoveTarget = null;
+        renderStageActors();
+        renderTimeline();
       }
+      clickMoveStep = 0;
+      clickMoveTargetActor = null;
     }
 
     function startPreview() {
