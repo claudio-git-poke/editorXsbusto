@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Cutscene Studio Studio</title>
+  <style>
+    body { font-family: sans-serif; background: #1a1a1a; color: #fff; margin: 20px; }
+    .layout { display: flex; gap: 20px; }
+    #canvas { border: 2px solid #444; background: #333; cursor: crosshair; }
+    .controls { display: flex; flex-direction: column; gap: 10px; width: 300px; }
+    .timeline { margin-top: 20px; background: #222; padding: 15px; border-radius: 8px; }
+    .track { display: flex; gap: 10px; background: #333; padding: 10px; min-height: 40px; align-items: center; }
+    .event-block { background: #007acc; padding: 8px 12px; border-radius: 4px; cursor: grab; user-select: none; }
+    button { background: #28a745; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <h1>Cutscene Editor (Vanilla JS)</h1>
+  
+  <div class="layout">
+    <!-- Area di Preview -->
+    <canvas id="canvas" width="640" height="360"></canvas>
+    
+    <!-- Controlli Evento -->
+    <div class="controls">
+      <h3>Aggiungi Evento</h3>
+      <label>Testo Dialogo:</label>
+      <input type="text" id="dialogText" placeholder="Es: Ciao eroe!">
+      <button onclick="addDialogueEvent()">+ Aggiungi a Timeline</button>
+      <hr>
+      <button onclick="exportJSON()">💾 Scarica Cutscene JSON</button>
+    </div>
+  </div>
+
+  <!-- Timeline Visiva Drag and Drop -->
+  <div class="timeline">
+    <h3>Timeline Eventi (Trascina per ordinare)</h3>
+    <div id="track" class="track"></div>
+  </div>
+
+  <script>
+    const events = [];
+    const track = document.getElementById('track');
+
+    // Aggiunge un blocco evento visivo
+    function addDialogueEvent() {
+      const text = document.getElementById('dialogText').value;
+      if (!text) return;
+
+      const eventData = { id: Date.now(), type: 'dialogue', text: text, time: events.length * 2 };
+      events.push(eventData);
+
+      renderTimeline();
+    }
+
+    // Renderizza i blocchi trascinabili
+    function renderTimeline() {
+      track.innerHTML = '';
+      events.forEach((ev, index) => {
+        const block = document.createElement('div');
+        block.className = 'event-block';
+        block.draggable = true;
+        block.innerText = `${index + 1}. [${ev.type}] ${ev.text}`;
+        
+        // Logica Drag & Drop HTML5 nativa
+        block.ondragstart = (e) => e.dataTransfer.setData('text/plain', index);
+        block.ondragover = (e) => e.preventDefault();
+        block.ondrop = (e) => {
+          e.preventDefault();
+          const oldIndex = e.dataTransfer.getData('text/plain');
+          const movedItem = events.splice(oldIndex, 1)[0];
+          events.splice(index, 0, movedItem);
+          renderTimeline();
+        };
+
+        track.appendChild(block);
+      });
+    }
+
+    // Esporta il JSON finale
+    function exportJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(events, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "cutscene.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+  </script>
+</body>
+</html>
