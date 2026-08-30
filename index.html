@@ -21,7 +21,6 @@
 
     #auth-screen { max-width: 400px; margin: 80px auto; text-align: center; }
     
-    /* STAGE CON DIMENSIONI NATIVE 16:9 (480x270 px) */
     .stage-container { 
       position: relative; 
       width: 480px; 
@@ -46,7 +45,6 @@
       align-items: center; 
       justify-content: center; 
       z-index: 10; 
-      transition: transform 0.05s linear; 
     }
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 8px; background: rgba(0,0,0,0.7); padding: 1px 3px; border-radius: 3px; margin-top: 1px; white-space: nowrap; }
@@ -82,7 +80,6 @@
 </head>
 <body>
 
-  <!-- Schermata Autenticazione (Visibile all'avvio) -->
   <div id="auth-screen" class="panel">
     <h3>Autenticazione Richiesta</h3>
     <div id="auth-logged" style="display:none;">
@@ -96,7 +93,6 @@
     </div>
   </div>
 
-  <!-- Editor (Nascosto finché l'utente non fa l'accesso) -->
   <div id="editor-screen" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
       <h1>Cutscene Studio Pro (16:9)</h1>
@@ -235,11 +231,11 @@
     let backgroundPath = '';
     let musicPath = '';
     
-    const actorsList = [
+    let actorsList = [
       { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [216, 111] }
     ];
 
-    const timelineEvents = [];
+    let timelineEvents = [];
     let isPreviewRunning = false;
     let isDialogueWaiting = false;
     let clickMoveStep = 0;
@@ -285,6 +281,70 @@
     function enterEditor() {
       document.getElementById('auth-screen').style.display = 'none';
       document.getElementById('editor-screen').style.display = 'block';
+    }
+
+    // Funzione mancante aggiunta per risolvere l'errore in console
+    async function loadCutsceneFromSupabase() {
+      const dayNumber = prompt("Inserisci il numero del giorno da caricare (es. 1):");
+      if (!dayNumber) return;
+
+      const fileName = `cutscenes/giorno${dayNumber.trim()}.json`;
+      try {
+        const { data, error } = await _supabase.storage.from('assets').download(fileName);
+        if (error) throw error;
+
+        const text = await data.text();
+        const json = JSON.parse(text);
+
+        backgroundPath = json.background || '';
+        musicPath = json.music || '';
+        actorsList = json.actors || actorsList;
+        timelineEvents.length = 0;
+        if (json.events) timelineEvents.push(...json.events);
+
+        if (backgroundPath) {
+          document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
+          document.getElementById('lbl-bg').innerText = `✅ Caricato`;
+        }
+        if (musicPath) {
+          document.getElementById('lbl-music').innerText = `✅ Caricato`;
+        }
+
+        renderStageActors();
+        renderTimeline();
+        updateDropdownOptions();
+        alert(`Cutscene ${fileName} caricata con successo!`);
+      } catch (e) {
+        alert("Errore nel caricamento: " + e.message);
+      }
+    }
+
+    function importLocalJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const json = JSON.parse(e.target.result);
+          backgroundPath = json.background || '';
+          musicPath = json.music || '';
+          actorsList = json.actors || actorsList;
+          timelineEvents.length = 0;
+          if (json.events) timelineEvents.push(...json.events);
+
+          if (backgroundPath) {
+            document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
+            document.getElementById('lbl-bg').innerText = `✅ Importato`;
+          }
+          renderStageActors();
+          renderTimeline();
+          updateDropdownOptions();
+          alert("JSON importato con successo!");
+        } catch (err) {
+          alert("File JSON non valido.");
+        }
+      };
+      reader.readAsText(file);
     }
 
     function renderStageActors() {
