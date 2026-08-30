@@ -19,35 +19,31 @@
     .btn-select { background: #252a41; border: 1px dashed #4b5563; text-align: left; }
     .btn-success { background: #10b981; }
 
-    /* AUTH SCREEN */
     #auth-screen { max-width: 400px; margin: 80px auto; }
     
-    /* STAGE CANVAS */
     .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; }
     .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; }
 
-    /* DIALOGUE BOX SIMULATOR */
-    #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.85); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; cursor: pointer; }
+    #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; cursor: pointer; }
     #dialogue-overlay .speaker { font-weight: bold; color: #f59e0b; margin-bottom: 4px; }
     #dialogue-overlay .click-hint { font-size: 10px; color: #aaa; text-align: right; margin-top: 5px; }
 
-    /* TIMELINE MULTI-TRACCIA */
     .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .timeline-controls { display: flex; gap: 10px; }
     .btn-play { background: #2563eb; }
     .btn-stop { background: #dc2626; }
-    .timeline-wrapper { background: #131625; border: 1px solid var(--border); border-radius: 6px; padding: 10px; position: relative; overflow-x: auto; }
+    .timeline-wrapper { background: #131625; border: 1px solid var(--border); border-radius: 6px; padding: 10px; position: relative; overflow-x: auto; user-select: none; }
     .timeline-ruler { display: flex; border-bottom: 1px solid var(--border); padding-bottom: 5px; font-size: 11px; color: #6b7280; }
     .ruler-mark { flex: 1; border-left: 1px solid #2e334d; padding-left: 4px; min-width: 60px; }
-    .timeline-tracks { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; min-height: 120px; position: relative; }
-    .track-row { position: relative; height: 32px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; }
-    .timeline-block { position: absolute; height: 26px; top: 3px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 90px; position: relative; width: 100%; }
+    .track-row { position: relative; height: 36px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; }
+    .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: grab; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+    .timeline-block:active { cursor: grabbing; opacity: 0.8; }
     .timeline-block.dialogue { background: #f59e0b; }
     .timeline-block.move { background: #3b82f6; }
 
-    /* MODAL */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
     .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 900px; margin: 0 auto; border: 1px solid var(--border); }
     .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
@@ -57,7 +53,7 @@
 </head>
 <body>
 
-  <!-- SCHERMATA LOGIN -->
+  <!-- AUTH SCREEN -->
   <div id="auth-screen" class="panel">
     <h3>Login Editor Cutscene</h3>
     <div id="auth-logged" style="display:none;">
@@ -77,16 +73,15 @@
     </div>
   </div>
 
-  <!-- EDITOR INTERFACCIA PRINCIPALE -->
+  <!-- EDITOR INTERFACE -->
   <div id="editor-screen" style="display:none;">
     <h1>Cutscene Studio Pro</h1>
 
-    <!-- TASTI IMPORT/CARICA CUTSCENE -->
     <div class="panel" style="display:flex; gap:10px; align-items:center;">
       <button style="background:#3b82f6;" onclick="loadCutsceneFromSupabase()">☁️ Carica Cutscene da Supabase</button>
       <button style="background:#8b5cf6;" onclick="document.getElementById('import-json-file').click()">📂 Importa JSON Locale</button>
       <input type="file" id="import-json-file" style="display:none;" accept=".json" onchange="importLocalJSON(event)">
-      <button style="background:#6366f1;" onclick="openFallbackUploader()">🖼 Carica Sprite Fallback Hero</button>
+      <button style="background:#6366f1;" onclick="openPicker('fallback_hero')">🖼 Carica Sprite Fallback Hero</button>
     </div>
 
     <div class="grid">
@@ -130,7 +125,7 @@
           <div class="field">
             <label>Tipo Evento:</label>
             <select id="event-type" onchange="toggleEventInputs()">
-              <option value="dialogue">Dialogo (Ferma la scena)</option>
+              <option value="dialogue">Dialogo (Ferma la Scena)</option>
               <option value="move">Movimento (GameBoy Step)</option>
             </select>
           </div>
@@ -140,7 +135,7 @@
               <label>Chi Parla:</label>
               <select id="dialogue-speaker">
                 <option value="main_character">Personaggio Principale</option>
-                <option value="png">PNG / NPC Selezionato</option>
+                <option value="png">PNG / NPC</option>
                 <option value="companion">Companion</option>
               </select>
             </div>
@@ -153,15 +148,11 @@
           <div id="move-fields" style="display:none;">
             <div class="field">
               <label>Scegli Attore da Muovere:</label>
-              <select id="move-actor" onchange="updateMoveActorOptions()">
+              <select id="move-actor">
                 <option value="main_character">Personaggio Principale</option>
                 <option value="png">PNG / NPC</option>
                 <option value="companion">Companion</option>
               </select>
-            </div>
-            <div class="field" id="npc-select-box" style="display:none;">
-              <label>Cartella Specifica PNG/NPC:</label>
-              <select id="move-npc-folder"></select>
             </div>
 
             <button type="button" style="background:#8b5cf6; margin-bottom:8px;" onclick="startClickMovement()">🖱 Registra Coordinate su Stage</button>
@@ -184,12 +175,11 @@
             <input type="number" id="event-duration" value="2" step="0.5">
           </div>
 
-          <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline Multi-Traccia</button>
+          <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline</button>
         </div>
       </div>
 
       <div>
-        <!-- STAGE CANVAS DRAG & DROP -->
         <div id="stage" class="stage-container" onclick="handleStageClick(event)">
           <div id="actor-hero" class="draggable-actor" style="left: 100px; top: 150px;">
             <img id="img-hero" src="">
@@ -204,15 +194,13 @@
             <div class="actor-label">Companion</div>
           </div>
 
-          <!-- DIALOGUE OVERLAY SIMULATOR -->
           <div id="dialogue-overlay" onclick="advanceDialogue()">
             <div class="speaker" id="dialogue-speaker-name">Speaker</div>
             <div class="text" id="dialogue-text-content">...</div>
-            <div class="click-hint">Premi per continuare ➔</div>
+            <div class="click-hint">Clicca qui per continuare ➔</div>
           </div>
         </div>
 
-        <!-- TIMELINE MULTI-TRACCIA -->
         <div class="panel">
           <div class="timeline-header">
             <h3>Timeline Multi-Traccia <span id="time-display">0.0 / 10.0 s</span></h3>
@@ -222,7 +210,7 @@
             </div>
           </div>
 
-          <div class="timeline-wrapper">
+          <div class="timeline-wrapper" id="timeline-wrapper">
             <div class="timeline-ruler">
               <div class="ruler-mark">0s</div>
               <div class="ruler-mark">2s</div>
@@ -246,14 +234,14 @@
     </div>
   </div>
 
-  <!-- MODAL ASSETS -->
+  <!-- MODAL ASSETS & INSPECTOR -->
   <div id="picker-modal" class="modal">
     <div class="modal-content">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
         <h3 id="modal-title">Seleziona Asset</h3>
         <button style="background:#dc3545;" onclick="closePicker()">Chiudi ✖</button>
       </div>
-      <div id="modal-upload-area" style="background:#252a41; padding:10px; border-radius:6px; margin-bottom:15px;"></div>
+      <div id="modal-upload-area" style="background:#252a41; padding:12px; border-radius:6px; margin-bottom:15px;"></div>
       <div id="asset-container" class="asset-grid"></div>
     </div>
   </div>
@@ -263,7 +251,7 @@
     const SUPABASE_KEY = "sb_publishable_3JHORvzXFoBh7XVVuSqgTg__ezQdQMa";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const selections = { background: '', music: '', npcFolder: '', npcPoseFile: '', companion: '' };
+    const selections = { background: '', music: '', npcFolder: '', companion: '' };
     const positions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
     const timeline = [];
     let currentCategory = '';
@@ -272,8 +260,8 @@
     let currentCutsceneName = "cutscene_daily.json";
     let bgAudio = new Audio();
     let clickMoveStep = 0;
+    let previewTimer = null;
 
-    // INIT & AUTH
     window.onload = async () => {
       const { data: { session } } = await _supabase.auth.getSession();
       if (session) {
@@ -282,7 +270,6 @@
         document.getElementById('user-info').innerText = `Sei già loggato come: ${session.user.email}`;
       }
       loadHeroFallback();
-      loadNpcFoldersList();
     };
 
     async function login() {
@@ -299,31 +286,7 @@
     }
 
     function loadHeroFallback() {
-      const fallbackUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/standing.png`;
-      document.getElementById('img-hero').src = fallbackUrl;
-    }
-
-    function openFallbackUploader() {
-      openPicker('fallback_hero');
-      document.getElementById('modal-title').innerText = "Carica Sprite Fallback Hero";
-      document.getElementById('modal-upload-area').innerHTML = `
-        <label>Seleziona i 4 File per Fallback Hero (standing, left, right, back):</label>
-        <input type="file" id="fallback-files" multiple accept="image/*">
-        <button onclick="uploadHeroFallback()">Carica Fallback</button>
-      `;
-      document.getElementById('asset-container').innerHTML = '';
-    }
-
-    async function uploadHeroFallback() {
-      const files = document.getElementById('fallback-files').files;
-      if (files.length < 4) return alert("Devi caricare esattamente i 4 file direzionali!");
-
-      for (const f of files) {
-        await _supabase.storage.from('assets').upload(`sprite/personaggioprincipale/fallback/${f.name}`, f, { upsert: true });
-      }
-      alert("Sprite di Fallback caricati correttamente!");
-      loadHeroFallback();
-      closePicker();
+      document.getElementById('img-hero').src = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/standing.png`;
     }
 
     function updateHeroPose() {
@@ -331,26 +294,93 @@
       document.getElementById('img-hero').src = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/${pose}.png`;
     }
 
-    async function loadNpcFoldersList() {
-      const { data } = await _supabase.storage.from('assets').list('sprite/png');
-      const select = document.getElementById('move-npc-folder');
-      select.innerHTML = '';
+    // ASSET PICKER & DIRECT UPLOAD FIX
+    async function openPicker(category) {
+      currentCategory = category;
+      document.getElementById('modal-title').innerText = `Gestione ${category.toUpperCase()}`;
+      document.getElementById('picker-modal').style.display = 'block';
+      
+      const uploadArea = document.getElementById('modal-upload-area');
+      uploadArea.innerHTML = `
+        <label style="font-weight:bold; color:#fff;">⬆️ Carica Nuovo Asset in "${category}":</label>
+        <div style="display:flex; gap:10px; margin-top:5px;">
+          <input type="file" id="upload-file-input" ${category === 'fallback_hero' ? 'multiple' : ''}>
+          <button style="background:#10b981;" onclick="uploadNewAsset()">Carica Su Supabase</button>
+        </div>
+      `;
+
+      await loadPickerItems();
+    }
+
+    function closePicker() { document.getElementById('picker-modal').style.display = 'none'; }
+
+    async function uploadNewAsset() {
+      const fileInput = document.getElementById('upload-file-input');
+      if (!fileInput.files.length) return alert("Seleziona almeno un file!");
+
+      let targetFolder = '';
+      if (currentCategory === 'background') targetFolder = 'background';
+      else if (currentCategory === 'music') targetFolder = 'music';
+      else if (currentCategory === 'npc') targetFolder = 'sprite/png';
+      else if (currentCategory === 'companion') targetFolder = 'sprite/companion';
+      else if (currentCategory === 'fallback_hero') targetFolder = 'sprite/personaggioprincipale/fallback';
+
+      for (const file of fileInput.files) {
+        const filePath = `${targetFolder}/${file.name}`;
+        await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+      }
+
+      alert("Upload completato con successo!");
+      await loadPickerItems();
+    }
+
+    async function loadPickerItems() {
+      const container = document.getElementById('asset-container');
+      container.innerHTML = 'Caricamento...';
+
+      let fetchPath = '';
+      if (currentCategory === 'background') fetchPath = 'background';
+      else if (currentCategory === 'music') fetchPath = 'music';
+      else if (currentCategory === 'npc') fetchPath = 'sprite/png';
+      else if (currentCategory === 'companion') fetchPath = 'sprite/companion';
+      else if (currentCategory === 'fallback_hero') fetchPath = 'sprite/personaggioprincipale/fallback';
+
+      const { data } = await _supabase.storage.from('assets').list(fetchPath);
+      container.innerHTML = '';
+
       data?.forEach(f => {
-        if (!f.id) {
-          const opt = document.createElement('option');
-          opt.value = `sprite/png/${f.name}/`;
-          opt.innerText = f.name;
-          select.appendChild(opt);
+        const fullPath = `${fetchPath}/${f.name}`;
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+
+        if (currentCategory === 'music') {
+          card.innerHTML = `🎵<br><span style="font-size:11px;">${f.name}</span>`;
+        } else {
+          card.innerHTML = `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><br><span style="font-size:11px;">${f.name}</span>`;
         }
+
+        card.onclick = () => {
+          selections[currentCategory] = fullPath;
+          const lbl = document.getElementById(`lbl-${currentCategory}`);
+          if (lbl) lbl.innerText = `✅ ${f.name}`;
+
+          if (currentCategory === 'background') {
+            document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath})`;
+          } else if (currentCategory === 'npc') {
+            document.getElementById('actor-npc').style.display = 'flex';
+            document.getElementById('img-npc').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+          } else if (currentCategory === 'companion') {
+            document.getElementById('actor-companion').style.display = 'flex';
+            document.getElementById('img-companion').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+          }
+          closePicker();
+        };
+
+        container.appendChild(card);
       });
     }
 
-    function updateMoveActorOptions() {
-      const actor = document.getElementById('move-actor').value;
-      document.getElementById('npc-select-box').style.display = actor === 'png' ? 'block' : 'none';
-    }
-
-    // STAGE CLICK MOVEMENT
+    // CLICK STAGE MOVEMENT
     function startClickMovement() {
       clickMoveStep = 1;
       alert("Clicca sullo Stage per la POSIZIONE DI PARTENZA");
@@ -371,11 +401,11 @@
         document.getElementById('move-x2').value = x;
         document.getElementById('move-y2').value = y;
         clickMoveStep = 0;
-        alert("Coordinate impostate!");
+        alert("Coordinate registrate con successo!");
       }
     }
 
-    // TIMELINE MULTI-TRACK SYSTEM
+    // TIMELINE SYSTEM & DRAG AND DROP
     function toggleEventInputs() {
       const type = document.getElementById('event-type').value;
       document.getElementById('dialogue-fields').style.display = type === 'dialogue' ? 'block' : 'none';
@@ -387,14 +417,13 @@
       const start = parseFloat(document.getElementById('event-start').value || 0);
       const duration = parseFloat(document.getElementById('event-duration').value || 2);
 
-      let item = { type, start, duration };
+      let item = { id: Date.now(), type, start, duration };
 
       if (type === 'dialogue') {
         item.speaker = document.getElementById('dialogue-speaker').value;
         item.text = document.getElementById('event-text').value;
       } else {
         item.actor = document.getElementById('move-actor').value;
-        if (item.actor === 'png') item.npcFolder = document.getElementById('move-npc-folder').value;
         item.from = [parseInt(document.getElementById('move-x1').value || 0), parseInt(document.getElementById('move-y1').value || 0)];
         item.to = [parseInt(document.getElementById('move-x2').value || 0), parseInt(document.getElementById('move-y2').value || 0)];
       }
@@ -409,7 +438,9 @@
       trackMove.innerHTML = '';
       trackDiag.innerHTML = '';
 
-      timeline.forEach((item, index) => {
+      const wrapperWidth = document.getElementById('timeline-wrapper').clientWidth - 20;
+
+      timeline.forEach((item) => {
         const block = document.createElement('div');
         block.className = `timeline-block ${item.type}`;
         
@@ -418,39 +449,131 @@
 
         block.style.left = `${leftPct}%`;
         block.style.width = `${widthPct}%`;
-        block.innerText = `${index + 1}. [${item.type}]`;
+        block.innerText = item.type === 'dialogue' ? `💬 ${item.speaker}: ${item.text}` : `🏃 ${item.actor}`;
 
-        block.onclick = () => {
-          if (confirm("Vuoi eliminare questo elemento dalla timeline?")) {
-            timeline.splice(index, 1);
+        // DRAG & DROP ON TIMELINE
+        let isDraggingBlock = false;
+        let startX = 0;
+        let initialStart = item.start;
+
+        block.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          isDraggingBlock = true;
+          startX = e.clientX;
+          initialStart = item.start;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          if (!isDraggingBlock) return;
+          const deltaX = e.clientX - startX;
+          const deltaSec = (deltaX / wrapperWidth) * 10;
+          let newStart = Math.max(0, Math.min(10 - item.duration, initialStart + deltaSec));
+          item.start = Math.round(newStart * 10) / 10;
+          block.style.left = `${(item.start / 10) * 100}%`;
+        });
+
+        document.addEventListener('mouseup', () => {
+          if (isDraggingBlock) {
+            isDraggingBlock = false;
             renderTimeline();
           }
-        };
+        });
+
+        // EDIT PROPERTIES ON CLICK
+        block.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openInspector(item);
+        });
 
         if (item.type === 'move') trackMove.appendChild(block);
         else trackDiag.appendChild(block);
       });
     }
 
-    // ADVANCED PREVIEW WITH MUSIC & PAUSE DIALOGUE
+    function openInspector(item) {
+      const modal = document.getElementById('picker-modal');
+      document.getElementById('modal-title').innerText = `Proprietà Evento (#${item.id})`;
+      document.getElementById('modal-upload-area').innerHTML = '';
+      
+      const container = document.getElementById('asset-container');
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:10px;">
+          <div class="field">
+            <label>Tempo Inizio (s):</label>
+            <input type="number" id="edit-start" value="${item.start}" step="0.1">
+          </div>
+          <div class="field">
+            <label>Durata (s):</label>
+            <input type="number" id="edit-duration" value="${item.duration}" step="0.1">
+          </div>
+          ${item.type === 'dialogue' ? `
+            <div class="field">
+              <label>Testo Dialogo:</label>
+              <input type="text" id="edit-text" value="${item.text}">
+            </div>
+          ` : `
+            <div class="field">
+              <label>Coordinate Partenza (X, Y):</label>
+              <input type="text" id="edit-from" value="${item.from.join(',')}">
+            </div>
+            <div class="field">
+              <label>Coordinate Arrivo (X, Y):</label>
+              <input type="text" id="edit-to" value="${item.to.join(',')}">
+            </div>
+          `}
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn-success" onclick="saveInspector(${item.id})">Salva Modifiche</button>
+            <button style="background:#dc3545;" onclick="deleteEvent(${item.id})">Elimina Evento</button>
+          </div>
+        </div>
+      `;
+      modal.style.display = 'block';
+    }
+
+    function saveInspector(id) {
+      const item = timeline.find(x => x.id === id);
+      if (!item) return;
+      item.start = parseFloat(document.getElementById('edit-start').value);
+      item.duration = parseFloat(document.getElementById('edit-duration').value);
+
+      if (item.type === 'dialogue') {
+        item.text = document.getElementById('edit-text').value;
+      } else {
+        item.from = document.getElementById('edit-from').value.split(',').map(Number);
+        item.to = document.getElementById('edit-to').value.split(',').map(Number);
+      }
+      renderTimeline();
+      closePicker();
+    }
+
+    function deleteEvent(id) {
+      const idx = timeline.findIndex(x => x.id === id);
+      if (idx !== -1) timeline.splice(idx, 1);
+      renderTimeline();
+      closePicker();
+    }
+
+    // AUDIO & PREVIEW FIX
     function startPreview() {
-      if (isPreviewRunning) return;
+      stopPreview();
       isPreviewRunning = true;
 
       if (selections.music) {
         bgAudio.src = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
         bgAudio.loop = true;
-        bgAudio.play();
+        bgAudio.play().catch(e => console.log("Audio play error:", e));
       }
 
       let currentTime = 0;
-      const interval = setInterval(() => {
-        if (!isPreviewRunning) { clearInterval(interval); return; }
-        if (isDialogueWaiting) return; // FERMA LA SCENA DURANTE IL DIALOGO
+      const triggeredEvents = new Set();
 
-        // Esegui eventi attivi al secondo corrente
+      previewTimer = setInterval(() => {
+        if (!isPreviewRunning) return;
+        if (isDialogueWaiting) return; // BLOCCO TOTALE DELLA SCENA
+
         timeline.forEach(ev => {
-          if (Math.abs(ev.start - currentTime) < 0.1) {
+          if (!triggeredEvents.has(ev.id) && currentTime >= ev.start) {
+            triggeredEvents.add(ev.id);
             if (ev.type === 'dialogue') {
               showDialogueOverlay(ev.speaker, ev.text);
             } else if (ev.type === 'move') {
@@ -462,7 +585,7 @@
         currentTime += 0.1;
         document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
 
-        if (currentTime >= 10) { stopPreview(); clearInterval(interval); }
+        if (currentTime >= 10.0) stopPreview();
       }, 100);
     }
 
@@ -497,41 +620,39 @@
     function stopPreview() {
       isPreviewRunning = false;
       isDialogueWaiting = false;
+      if (previewTimer) clearInterval(previewTimer);
       bgAudio.pause();
+      bgAudio.currentTime = 0;
       document.getElementById('dialogue-overlay').style.display = 'none';
     }
 
-    // IMPORT & SUPABASE SAVE/LOAD
+    // SUPABASE IMPORT/EXPORT
     async function saveToSupabase() {
-      let name = prompt("Nome della cutscene su Supabase:", currentCutsceneName);
+      let name = prompt("Nome cutscene su Supabase:", currentCutsceneName);
       if (!name) return;
       if (!name.endsWith('.json')) name += '.json';
 
       const { data: existing } = await _supabase.storage.from('assets').list('cutscenes');
-      const exists = existing?.some(f => f.name === name);
-
-      if (exists) {
-        if (!confirm(`La cutscene "${name}" esiste già. Vuoi sovrascriverla?`)) return;
+      if (existing?.some(f => f.name === name)) {
+        if (!confirm(`Cutscene "${name}" già esistente. Sovrascrivere?`)) return;
       }
 
-      const cutsceneData = generateJSONData();
-      await _supabase.storage.from('assets').upload(`cutscenes/${name}`, JSON.stringify(cutsceneData), { contentType: 'application/json', upsert: true });
+      await _supabase.storage.from('assets').upload(`cutscenes/${name}`, JSON.stringify(generateJSONData()), { contentType: 'application/json', upsert: true });
       currentCutsceneName = name;
-      alert(`Cutscene "${name}" salvata con successo!`);
+      alert("Cutscene salvata!");
     }
 
     async function loadCutsceneFromSupabase() {
       const { data } = await _supabase.storage.from('assets').list('cutscenes');
-      if (!data || !data.length) return alert("Nessuna cutscene trovata su Supabase!");
+      if (!data || !data.length) return alert("Nessuna cutscene trovata!");
 
       const names = data.map(f => f.name).join("\n");
-      const chosen = prompt(`Digita il nome della cutscene da caricare:\n\n${names}`);
+      const chosen = prompt(`Nome cutscene da caricare:\n\n${names}`);
       if (!chosen) return;
 
       const { data: fileData } = await _supabase.storage.from('assets').download(`cutscenes/${chosen}`);
       if (fileData) {
-        const text = await fileData.text();
-        applyCutsceneData(JSON.parse(text));
+        applyCutsceneData(JSON.parse(await fileData.text()));
         currentCutsceneName = chosen;
       }
     }
@@ -542,7 +663,7 @@
       const reader = new FileReader();
       reader.onload = (evt) => {
         applyCutsceneData(JSON.parse(evt.target.result));
-        alert("JSON importato correttamente!");
+        alert("JSON importato!");
       };
       reader.readAsText(file);
     }
@@ -556,11 +677,11 @@
     function generateJSONData() {
       return {
         setup: {
-          background: selections.background || "background/trama1/fallback.png",
+          background: selections.background || "background/fallback.png",
           music: selections.music || "music/fallback.mp3",
-          main_character: { pose: document.getElementById('hero-pose').value, fallback_folder: "sprite/personaggioprincipale/fallback/", initial_position: positions.main_character },
-          png: { folder: selections.npcFolder || "sprite/png/default/", initial_position: positions.png },
-          companion: { folder: selections.companion || "sprite/companion/fallback/", initial_position: positions.companion }
+          main_character: { pose: document.getElementById('hero-pose').value, initial_position: positions.main_character },
+          png: { folder: selections.npcFolder, initial_position: positions.png },
+          companion: { folder: selections.companion, initial_position: positions.companion }
         },
         timeline: timeline
       };
@@ -572,35 +693,6 @@
       a.href = dataStr;
       a.download = currentCutsceneName;
       a.click();
-    }
-
-    // GENERIC ASSET PICKER UTILS
-    async function openPicker(category) {
-      currentCategory = category;
-      document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
-      document.getElementById('picker-modal').style.display = 'block';
-      await loadPickerItems();
-    }
-    function closePicker() { document.getElementById('picker-modal').style.display = 'none'; }
-
-    async function loadPickerItems() {
-      const container = document.getElementById('asset-container');
-      container.innerHTML = 'Caricamento...';
-      const path = currentCategory === 'music' ? 'music' : 'sprite/companion';
-      const { data } = await _supabase.storage.from('assets').list(path);
-      container.innerHTML = '';
-      data?.forEach(f => {
-        const fullPath = `${path}/${f.name}`;
-        const card = document.createElement('div');
-        card.className = 'asset-card';
-        card.innerHTML = currentCategory === 'music' ? `🎵<br><span>${f.name}</span>` : `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><span>${f.name}</span>`;
-        card.onclick = () => {
-          selections[currentCategory] = fullPath;
-          document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${f.name}`;
-          closePicker();
-        };
-        container.appendChild(card);
-      });
     }
   </script>
 </body>
