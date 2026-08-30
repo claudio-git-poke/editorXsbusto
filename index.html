@@ -19,7 +19,7 @@
     .btn-select { background: #252a41; border: 1px dashed #4b5563; text-align: left; }
     .btn-success { background: #10b981; }
 
-    #auth-screen { max-width: 400px; margin: 80px auto; }
+    #auth-screen { max-width: 400px; margin: 80px auto; text-align: center; }
     
     /* STAGE CON DIMENSIONI NATIVE 16:9 (480x270 px) */
     .stage-container { 
@@ -82,21 +82,26 @@
 </head>
 <body>
 
+  <!-- Schermata Autenticazione (Visibile all'avvio) -->
   <div id="auth-screen" class="panel">
-    <h3>Login Cutscene Studio</h3>
+    <h3>Autenticazione Richiesta</h3>
     <div id="auth-logged" style="display:none;">
       <p id="user-info"></p>
       <button class="btn-success" style="width:100%" onclick="enterEditor()">Entra nell'Editor</button>
     </div>
     <div id="auth-form">
-      <div class="field"><label>Email:</label><input type="email" id="auth-email"></div>
-      <div class="field"><label>Password:</label><input type="password" id="auth-password"></div>
-      <button style="width:100%" onclick="login()">Accedi</button>
+      <div class="field" style="text-align:left;"><label>Email:</label><input type="email" id="auth-email"></div>
+      <div class="field" style="text-align:left;"><label>Password:</label><input type="password" id="auth-password"></div>
+      <button style="width:100%; margin-top:10px;" onclick="login()">Accedi</button>
     </div>
   </div>
 
+  <!-- Editor (Nascosto finché l'utente non fa l'accesso) -->
   <div id="editor-screen" style="display:none;">
-    <h1>Cutscene Studio Pro (16:9)</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <h1>Cutscene Studio Pro (16:9)</h1>
+      <button style="background:#dc2626;" onclick="logout()">Disconnetti</button>
+    </div>
 
     <div class="panel" style="display:flex; gap:10px;">
       <button style="background:#3b82f6;" onclick="loadCutsceneFromSupabase()">☁️ Carica da Supabase</button>
@@ -249,6 +254,9 @@
         document.getElementById('auth-logged').style.display = 'block';
         document.getElementById('auth-form').style.display = 'none';
         document.getElementById('user-info').innerText = `Logged: ${session.user.email}`;
+      } else {
+        document.getElementById('auth-logged').style.display = 'none';
+        document.getElementById('auth-form').style.display = 'block';
       }
       renderStageActors();
       renderTimeline();
@@ -259,7 +267,19 @@
       const email = document.getElementById('auth-email').value;
       const password = document.getElementById('auth-password').value;
       const { error } = await _supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message); else enterEditor();
+      if (error) {
+        alert("Errore Autenticazione: " + error.message);
+      } else {
+        enterEditor();
+      }
+    }
+
+    async function logout() {
+      await _supabase.auth.signOut();
+      document.getElementById('editor-screen').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'block';
+      document.getElementById('auth-logged').style.display = 'none';
+      document.getElementById('auth-form').style.display = 'block';
     }
 
     function enterEditor() {
@@ -739,51 +759,6 @@
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
-    }
-
-    async function loadCutsceneFromSupabase() {
-      const { data } = await _supabase.storage.from('assets').list('cutscenes');
-      if (!data?.length) return alert("Nessun file presente.");
-      const chosen = prompt(`Scegli file:\n${data.map(f => f.name).join("\n")}`);
-      if (!chosen) return;
-      const { data: fileData } = await _supabase.storage.from('assets').download(`cutscenes/${chosen}`);
-      if (fileData) applyCutsceneData(JSON.parse(await fileData.text()));
-    }
-
-    function importLocalJSON(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => applyCutsceneData(JSON.parse(evt.target.result));
-      reader.readAsText(file);
-    }
-
-    function applyCutsceneData(data) {
-      actorsList.length = 0;
-      timelineEvents.length = 0;
-      backgroundPath = data.background || '';
-      musicPath = data.music || '';
-
-      if (data.actors) actorsList.push(...data.actors);
-      if (data.events) timelineEvents.push(...data.events);
-
-      if (backgroundPath) {
-        document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
-        document.getElementById('lbl-bg').innerText = `✅ Sfondo caricato`;
-      } else {
-        document.getElementById('stage').style.backgroundImage = 'none';
-        document.getElementById('lbl-bg').innerText = `📁 Seleziona Sfondo...`;
-      }
-
-      if (musicPath) {
-        document.getElementById('lbl-music').innerText = `✅ Musica caricata`;
-      } else {
-        document.getElementById('lbl-music').innerText = `📁 Seleziona Musica...`;
-      }
-
-      renderStageActors();
-      renderTimeline();
-      updateDropdownOptions();
     }
   </script>
 </body>
