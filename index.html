@@ -3,52 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cutscene Studio Studio Pro</title>
+  <title>Cutscene Studio Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root { --bg: #121212; --panel: #1e1e1e; --accent: #007acc; --border: #333; --text: #fff; }
-    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 20px; }
-    h1, h3 { margin-top: 0; }
-    .grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
+    :root { --bg: #0f111a; --panel: #1a1d2d; --accent: #7c3aed; --border: #2e334d; --text: #f3f4f6; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 20px; }
+    h1, h3, h4 { margin-top: 0; color: #fff; }
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
     .panel { background: var(--panel); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
-    .field { margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 0.85em; color: #aaa; }
-    input, button, select { padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid #444; border-radius: 4px; }
+    .field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 0.8em; color: #9ca3af; }
+    input, button, select { padding: 8px; background: #252a41; color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
     button { cursor: pointer; background: var(--accent); font-weight: bold; border: none; }
     button:hover { opacity: 0.9; }
-    .btn-select { background: #3a3a3a; border: 1px dashed #666; text-align: left; }
-    .btn-success { background: #28a745; }
-    .btn-warning { background: #e67e22; }
-    .btn-preview { background: #9b59b6; width: 100%; font-size: 1.1em; padding: 12px; margin-bottom: 15px; }
+    .btn-select { background: #252a41; border: 1px dashed #4b5563; text-align: left; }
+    .btn-success { background: #10b981; }
 
-    /* Timeline Orizzontale */
-    .timeline-container { background: #2a2a2a; padding: 15px; border-radius: 6px; overflow-x: auto; white-space: nowrap; min-height: 120px; display: flex; gap: 10px; align-items: center; }
-    .timeline-block { display: inline-block; background: #333; border-top: 4px solid var(--accent); padding: 10px; border-radius: 4px; min-width: 200px; vertical-align: top; white-space: normal; }
+    /* STAGE CANVAS / DRAG & DROP AREA */
+    .stage-container { position: relative; width: 100%; height: 360px; background: #000; border: 2px solid var(--border); border-radius: 8px; overflow: hidden; background-size: cover; background-position: center; margin-bottom: 20px; }
+    .draggable-actor { position: absolute; width: 64px; height: 64px; cursor: move; user-select: none; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; }
+    .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; white-space: nowrap; }
 
-    /* Modal Fullscreen */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
-    .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 1000px; margin: 0 auto; border: 1px solid var(--border); }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
-    .close-btn { background: #dc3545; }
-    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-top: 15px; }
-    .asset-card { background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; }
-    .asset-card:hover { border-color: var(--accent); }
-    .asset-card img { max-width: 100%; height: 90px; object-fit: contain; pointer-events: none; }
+    /* TIMELINE STILE SCREENSHOT */
+    .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .timeline-controls { display: flex; gap: 10px; }
+    .btn-play { background: #2563eb; }
+    .btn-stop { background: #dc2626; }
+    .timeline-notice { font-size: 0.85em; color: #9ca3af; margin-bottom: 10px; }
     
-    /* Preview Canvas */
-    #preview-canvas { background: #000; display: block; margin: 0 auto; border: 2px solid #555; }
+    .timeline-wrapper { background: #131625; border: 1px solid var(--border); border-radius: 6px; padding: 10px; position: relative; overflow-x: auto; }
+    .timeline-ruler { display: flex; border-bottom: 1px solid var(--border); padding-bottom: 5px; font-size: 11px; color: #6b7280; }
+    .ruler-mark { flex: 1; text-align: left; border-left: 1px solid #2e334d; padding-left: 4px; min-width: 60px; }
+    
+    .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 100px; position: relative; }
+    .track-row { height: 36px; background: rgba(255,255,255,0.02); border-radius: 4px; position: relative; width: 100%; }
+    .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
+    .timeline-block.dialogue { background: #f59e0b; }
+
+    /* MODAL */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+    .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 900px; margin: 0 auto; border: 1px solid var(--border); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 15px; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
+    .asset-card { background: #252a41; border: 1px solid var(--border); border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; position: relative; }
+    .asset-card:hover { border-color: var(--accent); }
+    .asset-card img { max-width: 100%; height: 80px; object-fit: contain; pointer-events: none; }
+    .asset-card span { display: block; font-size: 0.75em; margin-top: 5px; word-break: break-all; }
   </style>
 </head>
 <body>
 
-  <h1>Cutscene Studio Studio Pro</h1>
-
-  <button class="btn-preview" onclick="openPreview()">▶ ANTEPRIMA CUTSCENE (Simula GitHub1)</button>
+  <h1>Cutscene Studio Pro</h1>
 
   <div class="grid">
     <div>
       <div class="panel">
-        <h3>1. Setup Asset della Scena</h3>
+        <h3>1. Asset Scena</h3>
         
         <div class="field">
           <label>Sfondo:</label>
@@ -61,8 +72,8 @@
         </div>
 
         <div class="field">
-          <label>Posa Personaggio Principale (Admin/Fallback):</label>
-          <select id="hero-pose">
+          <label>Posa Personaggio Principale (Admin):</label>
+          <select id="hero-pose" onchange="updateHeroPose()">
             <option value="standing">standing</option>
             <option value="left">left</option>
             <option value="right">right</option>
@@ -72,7 +83,7 @@
 
         <div class="field">
           <label>PNG / NPC:</label>
-          <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona o Carica NPC...</button>
+          <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona NPC...</button>
         </div>
 
         <div class="field">
@@ -82,91 +93,89 @@
       </div>
 
       <div class="panel">
-        <h3>2. Aggiungi Evento in Timeline</h3>
+        <h3>2. Aggiungi Evento</h3>
         <div class="field">
           <label>Tipo Evento:</label>
-          <select id="event-type" onchange="toggleEventFields()">
+          <select id="event-type">
             <option value="dialogue">Dialogo</option>
-            <option value="move">Movimento Personaggio</option>
+            <option value="move">Movimento</option>
           </select>
         </div>
-
-        <div id="field-dialogue">
-          <div class="field">
-            <label>Chi Parla:</label>
-            <select id="dialogue-speaker">
-              <option value="main_character">Personaggio Principale</option>
-              <option value="png">PNG / NPC</option>
-              <option value="companion">Companion</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Testo Dialogo:</label>
-            <input type="text" id="dialogue-text" placeholder="Scrivi il testo...">
-          </div>
+        <div class="field">
+          <label>Chi Parla / Si Muove:</label>
+          <select id="event-actor">
+            <option value="main_character">Personaggio Principale</option>
+            <option value="png">PNG / NPC</option>
+            <option value="companion">Companion</option>
+          </select>
         </div>
-
-        <div id="field-move" style="display:none;">
-          <div class="field">
-            <label>Chi si muove:</label>
-            <select id="move-actor">
-              <option value="main_character">Personaggio Principale</option>
-              <option value="png">PNG / NPC</option>
-              <option value="companion">Companion</option>
-            </select>
-          </div>
-          <div style="display:flex; gap:5px;">
-            <input type="number" id="move-x1" placeholder="Start X">
-            <input type="number" id="move-y1" placeholder="Start Y">
-          </div>
-          <div style="display:flex; gap:5px; margin-top:5px;">
-            <input type="number" id="move-x2" placeholder="End X">
-            <input type="number" id="move-y2" placeholder="End Y">
-          </div>
+        <div class="field">
+          <label>Testo Dialogo (se applicabile):</label>
+          <input type="text" id="event-text" placeholder="Scrivi il testo...">
         </div>
-
         <div class="field">
           <label>Durata (secondi):</label>
-          <input type="number" id="event-duration" value="3" step="0.5">
+          <input type="number" id="event-duration" value="2" step="0.5">
         </div>
-
         <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline</button>
       </div>
     </div>
 
     <div>
+      <!-- STAGE VISUALE DRAG & DROP -->
+      <div id="stage" class="stage-container">
+        <div id="actor-hero" class="draggable-actor" style="left: 100px; top: 150px;">
+          <img id="img-hero" src="https://via.placeholder.com/64?text=Hero">
+          <div class="actor-label">Hero</div>
+        </div>
+        <div id="actor-npc" class="draggable-actor" style="left: 300px; top: 150px; display:none;">
+          <img id="img-npc" src="">
+          <div class="actor-label">NPC</div>
+        </div>
+        <div id="actor-companion" class="draggable-actor" style="left: 500px; top: 150px; display:none;">
+          <img id="img-companion" src="">
+          <div class="actor-label">Companion</div>
+        </div>
+      </div>
+
+      <!-- TIMELINE STILE SCREENSHOT -->
       <div class="panel">
-        <h3>Timeline Sequenza (Da Sinistra a Destra)</h3>
-        <div id="timeline-track" class="timeline-container"></div>
+        <div class="timeline-header">
+          <h3>Timeline <span id="time-display">0.0 / 10.0 s</span></h3>
+          <div class="timeline-controls">
+            <button class="btn-play" onclick="startPreview()">▶ Anteprima</button>
+            <button class="btn-stop" onclick="stopPreview()">⏹ Stop</button>
+          </div>
+        </div>
+
+        <div class="timeline-notice">I dialoghi fermano la scena, ma la musica continua.</div>
+
+        <div class="timeline-wrapper">
+          <div class="timeline-ruler">
+            <div class="ruler-mark">0s</div>
+            <div class="ruler-mark">2s</div>
+            <div class="ruler-mark">4s</div>
+            <div class="ruler-mark">6s</div>
+            <div class="ruler-mark">8s</div>
+            <div class="ruler-mark">10s</div>
+          </div>
+          <div id="timeline-tracks" class="timeline-tracks"></div>
+        </div>
         <br>
-        <button class="btn-warning" style="width:100%" onclick="exportJSON()">💾 Scarica Cutscene JSON</button>
+        <button style="width:100%; background:#e67e22;" onclick="exportJSON()">💾 Scarica Cutscene JSON</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL PICKER & UPLOAD -->
+  <!-- MODAL ASSETS -->
   <div id="picker-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="modal-title">Gestione Asset</h2>
-        <button class="close-btn" onclick="closePicker()">Chiudi ✖</button>
+        <h3 id="modal-title">Seleziona Asset</h3>
+        <button style="background:#dc3545;" onclick="closePicker()">Chiudi ✖</button>
       </div>
-
-      <div id="modal-upload-area" style="background:#252525; padding:15px; border-radius:6px; margin-bottom:15px;"></div>
-
+      <div id="modal-upload-area" style="background:#252a41; padding:10px; border-radius:6px; margin-bottom:15px;"></div>
       <div id="asset-container" class="asset-grid"></div>
-    </div>
-  </div>
-
-  <!-- MODAL ANTEPRIMA CANVAS -->
-  <div id="preview-modal" class="modal">
-    <div class="modal-content" style="text-align:center;">
-      <div class="modal-header">
-        <h2>Simulatore Anteprima Cutscene (GitHub1)</h2>
-        <button class="close-btn" onclick="closePreview()">Chiudi ✖</button>
-      </div>
-      <canvas id="preview-canvas" width="800" height="450"></canvas>
-      <div id="preview-dialogue" style="margin-top:15px; font-size:1.2em; min-height:40px; background:#222; padding:10px;"></div>
     </div>
   </div>
 
@@ -175,19 +184,34 @@
     const SUPABASE_KEY = "sb_publishable_3JHORvzXFoBh7XVVuSqgTg__ezQdQMa";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const selections = { background: '', music: '', npc: '', companion: '' };
+    const selections = { background: '', music: '', npcFolder: '', npcPoseFile: '', companion: '' };
+    const positions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
     const timeline = [];
     let currentCategory = '';
+    let selectedNpcName = '';
 
-    function toggleEventFields() {
-      const type = document.getElementById('event-type').value;
-      document.getElementById('field-dialogue').style.display = type === 'dialogue' ? 'block' : 'none';
-      document.getElementById('field-move').style.display = type === 'move' ? 'block' : 'none';
-    }
+    // INIT DRAG & DROP STAGE
+    document.querySelectorAll('.draggable-actor').forEach(actor => {
+      let isDragging = false, offset = [0, 0];
+      actor.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offset = [actor.offsetLeft - e.clientX, actor.offsetTop - e.clientY];
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const x = Math.max(0, Math.min(736, e.clientX + offset[0]));
+        const y = Math.max(0, Math.min(296, e.clientY + offset[1]));
+        actor.style.left = x + 'px';
+        actor.style.top = y + 'px';
+        const id = actor.id.replace('actor-', '');
+        positions[id === 'hero' ? 'main_character' : id] = [x, y];
+      });
+      document.addEventListener('mouseup', () => isDragging = false);
+    });
 
     async function openPicker(category) {
       currentCategory = category;
-      document.getElementById('modal-title').innerText = `Gestione ${category.toUpperCase()}`;
+      document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
       document.getElementById('picker-modal').style.display = 'block';
       setupUploadArea();
       await loadPickerItems();
@@ -199,168 +223,197 @@
       const area = document.getElementById('modal-upload-area');
       if (currentCategory === 'background') {
         area.innerHTML = `
-          <h4>Carica Sfondi (Multiplo)</h4>
-          <label>Seleziona o crea Trama:</label>
-          <select id="bg-trama-select"><option value="trama1">trama1</option><option value="trama2">trama2</option></select>
-          <input type="text" id="bg-trama-custom" placeholder="Oppure nome Nuova Trama...">
-          <br><br>
+          <label>Carica Sfondo in Trama:</label>
+          <input type="text" id="bg-trama" placeholder="es: trama1">
           <input type="file" id="upload-files" multiple accept="image/*">
-          <button onclick="uploadBackgrounds()">Carica Sfondi</button>
+          <button onclick="uploadBackgrounds()">Carica</button>
         `;
       } else if (currentCategory === 'npc') {
         area.innerHTML = `
-          <h4>Carica Nuovo NPC (Richiede 4 File: standing, left, right, back)</h4>
-          <input type="text" id="npc-name" placeholder="Nome NPC (es: rosso)">
+          <label>Carica Nuovo NPC (Richiede 4 file: standing, left, right, back):</label>
+          <input type="text" id="npc-name" placeholder="Nome NPC">
           <input type="file" id="upload-files" multiple accept="image/*">
           <button onclick="uploadNPC()">Carica NPC</button>
         `;
       } else {
         area.innerHTML = `
-          <h4>Carica File (Multiplo)</h4>
           <input type="file" id="upload-files" multiple>
-          <button onclick="uploadGeneric()">Carica Assets</button>
+          <button onclick="uploadGeneric()">Carica File</button>
         `;
       }
     }
 
     async function loadPickerItems() {
       const container = document.getElementById('asset-container');
-      container.innerHTML = 'Caricamento in corso...';
-      
-      let folderPath = 'music/';
-      if (currentCategory === 'background') folderPath = 'background/';
-      if (currentCategory === 'npc') folderPath = 'sprite/png/';
-      if (currentCategory === 'companion') folderPath = 'sprite/companion/';
+      container.innerHTML = 'Caricamento...';
 
-      const { data, error } = await _supabase.storage.from('assets').list(folderPath, { limit: 100 });
-      if (error || !data) { container.innerHTML = 'Nessun asset trovato.'; return; }
-
-      container.innerHTML = '';
-
-      if (currentCategory === 'background' || currentCategory === 'npc') {
-        for (const item of data) {
-          if (!item.id) { // Cartella
-            const subPath = `${folderPath}${item.name}/`;
-            const { data: subFiles } = await _supabase.storage.from('assets').list(subPath);
-            if (subFiles) {
-              subFiles.forEach(file => {
-                const fullPath = `${subPath}${file.name}`;
-                createCard(container, fullPath, `${item.name}/${file.name}`);
+      if (currentCategory === 'background') {
+        const { data } = await _supabase.storage.from('assets').list('background');
+        container.innerHTML = '';
+        if (data) {
+          for (const folder of data) {
+            if (!folder.id) {
+              const { data: files } = await _supabase.storage.from('assets').list(`background/${folder.name}`);
+              files?.forEach(f => {
+                const fullPath = `background/${folder.name}/${f.name}`;
+                createAssetCard(container, fullPath, `${folder.name}/${f.name}`, () => {
+                  selections.background = fullPath;
+                  document.getElementById('lbl-bg').innerText = `✅ ${f.name}`;
+                  document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath})`;
+                  closePicker();
+                });
               });
             }
           }
         }
+      } else if (currentCategory === 'npc') {
+        // MOSTRA SOLO STANDING PER OGNI NPC
+        const { data } = await _supabase.storage.from('assets').list('sprite/png');
+        container.innerHTML = '';
+        if (data) {
+          for (const folder of data) {
+            if (!folder.id) {
+              const standingPath = `sprite/png/${folder.name}/standing.png`;
+              createAssetCard(container, standingPath, folder.name, () => openNpcPoseSelector(folder.name));
+            }
+          }
+        }
       } else {
-        data.forEach(item => {
-          const fullPath = `${folderPath}${item.name}`;
-          createCard(container, fullPath, item.name);
+        const path = currentCategory === 'music' ? 'music' : 'sprite/companion';
+        const { data } = await _supabase.storage.from('assets').list(path);
+        container.innerHTML = '';
+        data?.forEach(f => {
+          const fullPath = `${path}/${f.name}`;
+          createAssetCard(container, fullPath, f.name, () => {
+            selections[currentCategory] = fullPath;
+            document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${f.name}`;
+            if (currentCategory === 'companion') {
+              document.getElementById('actor-companion').style.display = 'flex';
+              document.getElementById('img-companion').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+            }
+            closePicker();
+          });
         });
       }
     }
 
-    function createCard(container, fullPath, displayName) {
+    function openNpcPoseSelector(npcName) {
+      selectedNpcName = npcName;
+      document.getElementById('modal-title').innerText = `Scegli posa per ${npcName}`;
+      const container = document.getElementById('asset-container');
+      container.innerHTML = '';
+
+      ['standing', 'left', 'right', 'back'].forEach(pose => {
+        const fullPath = `sprite/png/${npcName}/${pose}.png`;
+        createAssetCard(container, fullPath, pose, () => {
+          selections.npcFolder = `sprite/png/${npcName}/`;
+          selections.npcPoseFile = fullPath;
+          document.getElementById('lbl-npc').innerText = `✅ ${npcName} (${pose})`;
+          document.getElementById('actor-npc').style.display = 'flex';
+          document.getElementById('img-npc').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+          closePicker();
+        });
+      });
+    }
+
+    function createAssetCard(container, fullPath, label, onClick) {
       const card = document.createElement('div');
       card.className = 'asset-card';
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
-
+      const url = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+      
       if (currentCategory === 'music') {
-        card.innerHTML = `🎵<br><span>${displayName}</span>`;
+        card.innerHTML = `🎵<br><span>${label}</span>`;
       } else {
-        card.innerHTML = `<img src="${publicUrl}"><br><span>${displayName}</span>`;
+        card.innerHTML = `<img src="${url}"><span>${label}</span>`;
       }
-
-      card.onclick = () => {
-        selections[currentCategory] = fullPath;
-        document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${displayName}`;
-        closePicker();
-      };
+      card.onclick = onClick;
       container.appendChild(card);
     }
 
-    // UPLOAD LOGIC
+    // UPLOAD HANDLERS
     async function uploadBackgrounds() {
+      const trama = document.getElementById('bg-trama').value.trim() || 'trama1';
       const files = document.getElementById('upload-files').files;
-      const customTrama = document.getElementById('bg-trama-custom').value.trim();
-      const selectTrama = document.getElementById('bg-trama-select').value;
-      const trama = customTrama || selectTrama;
-
-      if (!files.length) return alert("Seleziona almeno un file!");
-
-      for (const file of files) {
-        const fullPath = `background/${trama}/${file.name}`;
-        await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
+      for (const f of files) {
+        await _supabase.storage.from('assets').upload(`background/${trama}/${f.name}`, f, { upsert: true });
       }
-      alert("Sfondi caricati con successo!");
+      alert("Sfondi caricati!");
       loadPickerItems();
     }
 
     async function uploadNPC() {
       const name = document.getElementById('npc-name').value.trim();
       const files = document.getElementById('upload-files').files;
+      if (!name || files.length < 4) return alert("Inserisci il nome e seleziona i 4 file direzionali!");
 
-      if (!name || files.length < 4) return alert("Inserisci il nome NPC e carica 4 file!");
-
-      const folderPath = `sprite/png/${name}/`;
-      const { data: existing } = await _supabase.storage.from('assets').list(folderPath);
-
-      if (existing && existing.length > 0) {
-        const overwrite = confirm(`La cartella NPC "${name}" esiste già. Vuoi sovrascrivere i file?`);
-        if (!overwrite) return;
+      for (const f of files) {
+        await _supabase.storage.from('assets').upload(`sprite/png/${name}/${f.name}`, f, { upsert: true });
       }
-
-      for (const file of files) {
-        const fullPath = `${folderPath}${file.name}`;
-        await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
-      }
-      alert("NPC caricato correttamente!");
+      alert("NPC caricato con successo!");
       loadPickerItems();
     }
 
     async function uploadGeneric() {
       const files = document.getElementById('upload-files').files;
-      let path = currentCategory === 'music' ? 'music/' : 'sprite/companion/';
-
-      for (const file of files) {
-        await _supabase.storage.from('assets').upload(`${path}${file.name}`, file, { upsert: true });
+      const path = currentCategory === 'music' ? 'music' : 'sprite/companion';
+      for (const f of files) {
+        await _supabase.storage.from('assets').upload(`${path}/${f.name}`, f, { upsert: true });
       }
-      alert("Upload completato!");
+      alert("File caricati!");
       loadPickerItems();
     }
 
-    // TIMELINE LOGIC
+    // TIMELINE SYSTEM
     function addTimelineEvent() {
       const type = document.getElementById('event-type').value;
+      const actor = document.getElementById('event-actor').value;
+      const text = document.getElementById('event-text').value;
       const duration = parseFloat(document.getElementById('event-duration').value);
 
-      let eventData = { type, duration };
-
-      if (type === 'dialogue') {
-        eventData.speaker = document.getElementById('dialogue-speaker').value;
-        eventData.text = document.getElementById('dialogue-text').value;
-      } else {
-        eventData.actor = document.getElementById('move-actor').value;
-        eventData.from = [parseInt(document.getElementById('move-x1').value || 0), parseInt(document.getElementById('move-y1').value || 0)];
-        eventData.to = [parseInt(document.getElementById('move-x2').value || 0), parseInt(document.getElementById('move-y2').value || 0)];
-      }
-
-      timeline.push(eventData);
+      timeline.push({ type, actor, text, duration, pos: [...positions[actor]] });
       renderTimeline();
     }
 
     function renderTimeline() {
-      const track = document.getElementById('timeline-track');
-      track.innerHTML = '';
+      const tracks = document.getElementById('timeline-tracks');
+      tracks.innerHTML = '';
 
+      let currentTime = 0;
       timeline.forEach((item, index) => {
         const block = document.createElement('div');
-        block.className = 'timeline-block';
-        block.innerHTML = `
-          <b>#${index + 1} [${item.type}]</b> (${item.duration}s)<br>
-          ${item.type === 'dialogue' ? `${item.speaker}: "${item.text}"` : `Move ${item.actor}`}
-        `;
-        track.appendChild(block);
+        block.className = `timeline-block ${item.type === 'dialogue' ? 'dialogue' : ''}`;
+        
+        const widthPct = (item.duration / 10) * 100;
+        const leftPct = (currentTime / 10) * 100;
+
+        block.style.left = `${leftPct}%`;
+        block.style.width = `${widthPct}%`;
+        block.innerHTML = `${item.type === 'dialogue' ? 'Dialogo' : 'Movimento'} @ ${currentTime.toFixed(1)}s`;
+
+        tracks.appendChild(block);
+        currentTime += item.duration;
       });
+
+      document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
     }
+
+    function startPreview() {
+      let step = 0;
+      function playStep() {
+        if (step >= timeline.length) return alert("Anteprima completata!");
+        const ev = timeline[step];
+        if (ev.type === 'move') {
+          const actorEl = document.getElementById(`actor-${ev.actor === 'main_character' ? 'hero' : ev.actor}`);
+          actorEl.style.left = `${ev.pos[0]}px`;
+          actorEl.style.top = `${ev.pos[1]}px`;
+        }
+        step++;
+        setTimeout(playStep, ev.duration * 1000);
+      }
+      playStep();
+    }
+
+    function stopPreview() { location.reload(); }
 
     function exportJSON() {
       const output = {
@@ -369,10 +422,17 @@
           music: selections.music || "music/fallback.mp3",
           main_character: {
             pose: document.getElementById('hero-pose').value,
-            fallback_folder: "sprite/personaggioprincipale/fallback/"
+            fallback_folder: "sprite/personaggioprincipale/fallback/",
+            initial_position: positions.main_character
           },
-          png: { folder: selections.npc || "sprite/png/default/" },
-          companion: { folder: selections.companion || "sprite/companion/fallback/" }
+          png: {
+            folder: selections.npcFolder || "sprite/png/default/",
+            initial_position: positions.png
+          },
+          companion: {
+            folder: selections.companion || "sprite/companion/fallback/",
+            initial_position: positions.companion
+          }
         },
         timeline: timeline
       };
@@ -383,40 +443,6 @@
       a.download = "cutscene_daily.json";
       a.click();
     }
-
-    // PREVIEW CANVAS SIMULATOR (SIMULA GITHUB1)
-    function openPreview() {
-      document.getElementById('preview-modal').style.display = 'block';
-      const canvas = document.getElementById('preview-canvas');
-      const ctx = canvas.getContext('2d');
-      const dialogBox = document.getElementById('preview-dialogue');
-      
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#333';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      let step = 0;
-      function playNext() {
-        if (step >= timeline.length) {
-          dialogBox.innerText = "FINE CUTSCENE - Apertura Bustina!";
-          return;
-        }
-
-        const ev = timeline[step];
-        if (ev.type === 'dialogue') {
-          dialogBox.innerText = `[${ev.speaker}]: ${ev.text}`;
-        } else {
-          dialogBox.innerText = `[Movimento ${ev.actor} da ${ev.from} a ${ev.to}]`;
-        }
-
-        step++;
-        setTimeout(playNext, ev.duration * 1000);
-      }
-
-      playNext();
-    }
-
-    function closePreview() { document.getElementById('preview-modal').style.display = 'none'; }
   </script>
 </body>
 </html>
