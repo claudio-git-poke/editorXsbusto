@@ -124,4 +124,151 @@
     }
 
     window.onload = () => {
-      const savedUrl =Non hai indicato il progetto o l'attività specifica a cui ti riferisci! 
+      const savedUrl = localStorage.getItem('sb_url');
+      const savedKey = localStorage.getItem('sb_key');
+      if (savedUrl && savedKey) {
+        document.getElementById('supabase-url').value = savedUrl;
+        document.getElementById('supabase-key').value = savedKey;
+        _supabase = supabase.createClient(savedUrl, savedKey);
+        loadAssets();
+      }
+    };
+
+    async function loadAssets() {
+      if (!_supabase) return;
+      const allFiles = await fetchAllAssets('');
+      
+      const bgs = allFiles.filter(f => f.startsWith('background/'));
+      const music = allFiles.filter(f => f.startsWith('music/'));
+      
+      const heroes = extractFolders(allFiles, 'sprite/personaggioprincipale/');
+      const npcs = extractFolders(allFiles, 'sprite/png/');
+      const companions = extractFolders(allFiles, 'sprite/companion/');
+
+      populateSelect('select-bg', bgs);
+      populateSelect('select-music', music);
+      populateSelect('select-hero', heroes);
+      populateSelect('select-npc', npcs);
+      populateSelect('select-companion', companions);
+    }
+
+    async function fetchAllAssets(folder) {
+      const { data, error } = await _supabase.storage.from('assets').list(folder);
+      if (error || !data) return [];
+
+      let files = [];
+      for (const item of data) {
+        const path = folder ? `${folder}/${item.name}` : item.name;
+        if (!item.id) { 
+          const subFiles = await fetchAllAssets(path);
+          files = files.concat(subFiles);
+        } else {
+          files.push(path);
+        }
+      }
+      return files;
+    }
+
+    function extractFolders(files, prefix) {
+      const folders = new Set();
+      files.filter(f => f.startsWith(prefix)).forEach(f => {
+        const relative = f.replace(prefix, '');
+        const parts = relative.split('/');
+        if (parts.length > 1) folders.add(parts[0]);
+      });
+      return Array.from(folders);
+    }
+
+    function populateSelect(id, items) {
+      const select = document.getElementById(id);
+      select.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
+    }
+
+    function addDialogue() {
+      const speaker = document.getElementById('dialogue-speaker').value;
+      const text = document.getElementById('dialogue-text').value.trim();
+      if (!text) return alert("Inserisci un testo!");
+
+      timeline.push({ type: 'dialogue', speaker, text });
+      document.getElementById('dialogue-text').value = '';
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      const container = document.getElementById('timeline-track');
+      container.innerHTML = '';
+
+      timeline.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'block';
+        div.draggable = true;
+        div.innerHTML = `<span><b>${index + 1}.</b> [${item.speaker}]: "${item.text}"</span>`;
+
+        div.ondragstart = (e) => e.dataTransfer.setData('text/plain', index);
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+          e.preventDefault();
+          const fromIndex = e.dataTransfer.getData('text/plain');
+          const moved = timeline.splice(fromIndex, 1)[0];
+          timeline.splice(index, 0, moved);
+          renderTimeline();
+        };
+
+        container.appendChild(div);
+      });
+    }
+
+    async function uploadAsset() {
+      if (!_supabase) return alert("Connettiti prima a Supabase!");
+      const folder = document.getElementById('upload-folder').value.trim();
+      const fileInput = document.getElementById('upload-file');
+      const file = fileInput.files[0];
+
+      if (!folder || !file) return alert("Inserisci la cartella e seleziona un file!");
+
+      const fullPath = `${folder}/${file.name}`.replace(/\/+/g, '/');
+      const { error } = await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
+
+      if (error) alert("Errore: " + error.message);
+      else {
+        alert("File caricato in: " + fullPath);
+        loadAssets();
+      }
+    }
+
+    function exportJSON() {
+      const hero = document.getElementById('select-hero').value;
+      const npc = document.getElementById('select-npc').value;
+      const companion = document.getElementById('select-companion').value;
+
+      const output = {
+        setup: {
+          background: document.getElementById('select-bg').value || "background/trama1/fallback.png",
+          background_fallback: "background/trama1/fallback.png",
+          music: document.getElementById('select-music').value || "music/fallback.mp3",
+          music_fallback: "music/fallback.mp3",
+          main_character: {
+            folder: hero ? `sprite/personaggioprincipale/${hero}/` : "sprite/personaggioprincipale/fallback/",
+            fallback_folder: "sprite/personaggioprincipale/fallback/"
+          },
+          png: {
+            folder: npc ? `sprite/png/${npc}/` : "sprite/png/default/",
+            fallback_folder: "sprite/png/default/"
+          },
+          companion: {
+            folder: companion ? `sprite/companion/${companion}/` : "sprite/companion/fallback/",
+            fallback_folder: "sprite/companion/fallback/"
+          }
+        },
+        timeline: timeline
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(output, null, 2));
+      const a = document.createElement('a');
+      a.href = dataStr;
+      a.download = "cutscene_daily.json";
+      a.click();
+    }
+  </script>
+</body>
+</html>
