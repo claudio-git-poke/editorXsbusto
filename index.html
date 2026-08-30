@@ -28,7 +28,12 @@
     .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 10px; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 3px; margin-top: 2px; }
 
-    /* TIMELINE */
+    /* DIALOGUE BOX SIMULATOR */
+    #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.85); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; cursor: pointer; }
+    #dialogue-overlay .speaker { font-weight: bold; color: #f59e0b; margin-bottom: 4px; }
+    #dialogue-overlay .click-hint { font-size: 10px; color: #aaa; text-align: right; margin-top: 5px; }
+
+    /* TIMELINE MULTI-TRACCIA */
     .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .timeline-controls { display: flex; gap: 10px; }
     .btn-play { background: #2563eb; }
@@ -36,8 +41,9 @@
     .timeline-wrapper { background: #131625; border: 1px solid var(--border); border-radius: 6px; padding: 10px; position: relative; overflow-x: auto; }
     .timeline-ruler { display: flex; border-bottom: 1px solid var(--border); padding-bottom: 5px; font-size: 11px; color: #6b7280; }
     .ruler-mark { flex: 1; border-left: 1px solid #2e334d; padding-left: 4px; min-width: 60px; }
-    .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 80px; position: relative; }
-    .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; display: flex; align-items: center; }
+    .timeline-tracks { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; min-height: 120px; position: relative; }
+    .track-row { position: relative; height: 32px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; }
+    .timeline-block { position: absolute; height: 26px; top: 3px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .timeline-block.dialogue { background: #f59e0b; }
     .timeline-block.move { background: #3b82f6; }
 
@@ -74,6 +80,14 @@
   <!-- EDITOR INTERFACCIA PRINCIPALE -->
   <div id="editor-screen" style="display:none;">
     <h1>Cutscene Studio Pro</h1>
+
+    <!-- TASTI IMPORT/CARICA CUTSCENE -->
+    <div class="panel" style="display:flex; gap:10px; align-items:center;">
+      <button style="background:#3b82f6;" onclick="loadCutsceneFromSupabase()">☁️ Carica Cutscene da Supabase</button>
+      <button style="background:#8b5cf6;" onclick="document.getElementById('import-json-file').click()">📂 Importa JSON Locale</button>
+      <input type="file" id="import-json-file" style="display:none;" accept=".json" onchange="importLocalJSON(event)">
+      <button style="background:#6366f1;" onclick="openFallbackUploader()">🖼 Carica Sprite Fallback Hero</button>
+    </div>
 
     <div class="grid">
       <div>
@@ -116,21 +130,20 @@
           <div class="field">
             <label>Tipo Evento:</label>
             <select id="event-type" onchange="toggleEventInputs()">
-              <option value="dialogue">Dialogo</option>
+              <option value="dialogue">Dialogo (Ferma la scena)</option>
               <option value="move">Movimento (GameBoy Step)</option>
             </select>
           </div>
 
-          <div class="field">
-            <label>Attore:</label>
-            <select id="event-actor">
-              <option value="main_character">Personaggio Principale</option>
-              <option value="png">PNG / NPC</option>
-              <option value="companion">Companion</option>
-            </select>
-          </div>
-
           <div id="dialogue-fields">
+            <div class="field">
+              <label>Chi Parla:</label>
+              <select id="dialogue-speaker">
+                <option value="main_character">Personaggio Principale</option>
+                <option value="png">PNG / NPC Selezionato</option>
+                <option value="companion">Companion</option>
+              </select>
+            </div>
             <div class="field">
               <label>Testo Dialogo:</label>
               <input type="text" id="event-text" placeholder="Scrivi il testo...">
@@ -138,7 +151,20 @@
           </div>
 
           <div id="move-fields" style="display:none;">
-            <button type="button" style="background:#8b5cf6; margin-bottom:8px;" onclick="startClickMovement()">🖱 Registra con Click su Stage</button>
+            <div class="field">
+              <label>Scegli Attore da Muovere:</label>
+              <select id="move-actor" onchange="updateMoveActorOptions()">
+                <option value="main_character">Personaggio Principale</option>
+                <option value="png">PNG / NPC</option>
+                <option value="companion">Companion</option>
+              </select>
+            </div>
+            <div class="field" id="npc-select-box" style="display:none;">
+              <label>Cartella Specifica PNG/NPC:</label>
+              <select id="move-npc-folder"></select>
+            </div>
+
+            <button type="button" style="background:#8b5cf6; margin-bottom:8px;" onclick="startClickMovement()">🖱 Registra Coordinate su Stage</button>
             <div style="display:flex; gap:5px;">
               <input type="number" id="move-x1" placeholder="Start X">
               <input type="number" id="move-y1" placeholder="Start Y">
@@ -150,11 +176,15 @@
           </div>
 
           <div class="field" style="margin-top:8px;">
+            <label>Tempo Inizio (secondi):</label>
+            <input type="number" id="event-start" value="0" step="0.5">
+          </div>
+          <div class="field">
             <label>Durata (secondi):</label>
             <input type="number" id="event-duration" value="2" step="0.5">
           </div>
 
-          <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline</button>
+          <button class="btn-success" onclick="addTimelineEvent()">+ Inserisci in Timeline Multi-Traccia</button>
         </div>
       </div>
 
@@ -173,12 +203,19 @@
             <img id="img-companion" src="">
             <div class="actor-label">Companion</div>
           </div>
+
+          <!-- DIALOGUE OVERLAY SIMULATOR -->
+          <div id="dialogue-overlay" onclick="advanceDialogue()">
+            <div class="speaker" id="dialogue-speaker-name">Speaker</div>
+            <div class="text" id="dialogue-text-content">...</div>
+            <div class="click-hint">Premi per continuare ➔</div>
+          </div>
         </div>
 
-        <!-- TIMELINE -->
+        <!-- TIMELINE MULTI-TRACCIA -->
         <div class="panel">
           <div class="timeline-header">
-            <h3>Timeline <span id="time-display">0.0 / 10.0 s</span></h3>
+            <h3>Timeline Multi-Traccia <span id="time-display">0.0 / 10.0 s</span></h3>
             <div class="timeline-controls">
               <button class="btn-play" onclick="startPreview()">▶ Anteprima</button>
               <button class="btn-stop" onclick="stopPreview()">⏹ Stop</button>
@@ -194,7 +231,10 @@
               <div class="ruler-mark">8s</div>
               <div class="ruler-mark">10s</div>
             </div>
-            <div id="timeline-tracks" class="timeline-tracks"></div>
+            <div id="timeline-tracks" class="timeline-tracks">
+              <div class="track-row" id="track-move"></div>
+              <div class="track-row" id="track-dialogue"></div>
+            </div>
           </div>
           <br>
           <div style="display:flex; gap:10px;">
@@ -228,10 +268,12 @@
     const timeline = [];
     let currentCategory = '';
     let isPreviewRunning = false;
-    let previewInterval = null;
-    let clickMoveStep = 0; // 0: inactive, 1: wait start, 2: wait end
+    let isDialogueWaiting = false;
+    let currentCutsceneName = "cutscene_daily.json";
+    let bgAudio = new Audio();
+    let clickMoveStep = 0;
 
-    // INITIALIZATION & AUTH
+    // INIT & AUTH
     window.onload = async () => {
       const { data: { session } } = await _supabase.auth.getSession();
       if (session) {
@@ -240,6 +282,7 @@
         document.getElementById('user-info').innerText = `Sei già loggato come: ${session.user.email}`;
       }
       loadHeroFallback();
+      loadNpcFoldersList();
     };
 
     async function login() {
@@ -260,15 +303,57 @@
       document.getElementById('img-hero').src = fallbackUrl;
     }
 
+    function openFallbackUploader() {
+      openPicker('fallback_hero');
+      document.getElementById('modal-title').innerText = "Carica Sprite Fallback Hero";
+      document.getElementById('modal-upload-area').innerHTML = `
+        <label>Seleziona i 4 File per Fallback Hero (standing, left, right, back):</label>
+        <input type="file" id="fallback-files" multiple accept="image/*">
+        <button onclick="uploadHeroFallback()">Carica Fallback</button>
+      `;
+      document.getElementById('asset-container').innerHTML = '';
+    }
+
+    async function uploadHeroFallback() {
+      const files = document.getElementById('fallback-files').files;
+      if (files.length < 4) return alert("Devi caricare esattamente i 4 file direzionali!");
+
+      for (const f of files) {
+        await _supabase.storage.from('assets').upload(`sprite/personaggioprincipale/fallback/${f.name}`, f, { upsert: true });
+      }
+      alert("Sprite di Fallback caricati correttamente!");
+      loadHeroFallback();
+      closePicker();
+    }
+
     function updateHeroPose() {
       const pose = document.getElementById('hero-pose').value;
       document.getElementById('img-hero').src = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/${pose}.png`;
     }
 
-    // STAGE CLICK MOVEMENT RECORDING
+    async function loadNpcFoldersList() {
+      const { data } = await _supabase.storage.from('assets').list('sprite/png');
+      const select = document.getElementById('move-npc-folder');
+      select.innerHTML = '';
+      data?.forEach(f => {
+        if (!f.id) {
+          const opt = document.createElement('option');
+          opt.value = `sprite/png/${f.name}/`;
+          opt.innerText = f.name;
+          select.appendChild(opt);
+        }
+      });
+    }
+
+    function updateMoveActorOptions() {
+      const actor = document.getElementById('move-actor').value;
+      document.getElementById('npc-select-box').style.display = actor === 'png' ? 'block' : 'none';
+    }
+
+    // STAGE CLICK MOVEMENT
     function startClickMovement() {
       clickMoveStep = 1;
-      alert("Clicca sullo Stage per impostare la POSIZIONE DI PARTENZA");
+      alert("Clicca sullo Stage per la POSIZIONE DI PARTENZA");
     }
 
     function handleStageClick(e) {
@@ -281,42 +366,215 @@
         document.getElementById('move-x1').value = x;
         document.getElementById('move-y1').value = y;
         clickMoveStep = 2;
-        alert("Ora clicca sullo Stage per impostare la POSIZIONE DI ARRIVO");
+        alert("Clicca sullo Stage per la POSIZIONE DI ARRIVO");
       } else if (clickMoveStep === 2) {
         document.getElementById('move-x2').value = x;
         document.getElementById('move-y2').value = y;
         clickMoveStep = 0;
-        alert("Coordinate di movimento impostate con successo!");
+        alert("Coordinate impostate!");
       }
     }
 
-    // DRAG & DROP STAGE ACTORS
-    document.querySelectorAll('.draggable-actor').forEach(actor => {
-      let isDragging = false, offset = [0, 0];
-      actor.addEventListener('mousedown', (e) => {
-        if (clickMoveStep !== 0) return;
-        isDragging = true;
-        offset = [actor.offsetLeft - e.clientX, actor.offsetTop - e.clientY];
-      });
-      document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const x = Math.max(0, Math.min(736, e.clientX + offset[0]));
-        const y = Math.max(0, Math.min(296, e.clientY + offset[1]));
-        actor.style.left = x + 'px';
-        actor.style.top = y + 'px';
-        const id = actor.id.replace('actor-', '');
-        positions[id === 'hero' ? 'main_character' : id] = [x, y];
-      });
-      document.addEventListener('mouseup', () => isDragging = false);
-    });
-
+    // TIMELINE MULTI-TRACK SYSTEM
     function toggleEventInputs() {
       const type = document.getElementById('event-type').value;
       document.getElementById('dialogue-fields').style.display = type === 'dialogue' ? 'block' : 'none';
       document.getElementById('move-fields').style.display = type === 'move' ? 'block' : 'none';
     }
 
-    // ASSET PICKER
+    function addTimelineEvent() {
+      const type = document.getElementById('event-type').value;
+      const start = parseFloat(document.getElementById('event-start').value || 0);
+      const duration = parseFloat(document.getElementById('event-duration').value || 2);
+
+      let item = { type, start, duration };
+
+      if (type === 'dialogue') {
+        item.speaker = document.getElementById('dialogue-speaker').value;
+        item.text = document.getElementById('event-text').value;
+      } else {
+        item.actor = document.getElementById('move-actor').value;
+        if (item.actor === 'png') item.npcFolder = document.getElementById('move-npc-folder').value;
+        item.from = [parseInt(document.getElementById('move-x1').value || 0), parseInt(document.getElementById('move-y1').value || 0)];
+        item.to = [parseInt(document.getElementById('move-x2').value || 0), parseInt(document.getElementById('move-y2').value || 0)];
+      }
+
+      timeline.push(item);
+      renderTimeline();
+    }
+
+    function renderTimeline() {
+      const trackMove = document.getElementById('track-move');
+      const trackDiag = document.getElementById('track-dialogue');
+      trackMove.innerHTML = '';
+      trackDiag.innerHTML = '';
+
+      timeline.forEach((item, index) => {
+        const block = document.createElement('div');
+        block.className = `timeline-block ${item.type}`;
+        
+        const widthPct = (item.duration / 10) * 100;
+        const leftPct = (item.start / 10) * 100;
+
+        block.style.left = `${leftPct}%`;
+        block.style.width = `${widthPct}%`;
+        block.innerText = `${index + 1}. [${item.type}]`;
+
+        block.onclick = () => {
+          if (confirm("Vuoi eliminare questo elemento dalla timeline?")) {
+            timeline.splice(index, 1);
+            renderTimeline();
+          }
+        };
+
+        if (item.type === 'move') trackMove.appendChild(block);
+        else trackDiag.appendChild(block);
+      });
+    }
+
+    // ADVANCED PREVIEW WITH MUSIC & PAUSE DIALOGUE
+    function startPreview() {
+      if (isPreviewRunning) return;
+      isPreviewRunning = true;
+
+      if (selections.music) {
+        bgAudio.src = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
+        bgAudio.loop = true;
+        bgAudio.play();
+      }
+
+      let currentTime = 0;
+      const interval = setInterval(() => {
+        if (!isPreviewRunning) { clearInterval(interval); return; }
+        if (isDialogueWaiting) return; // FERMA LA SCENA DURANTE IL DIALOGO
+
+        // Esegui eventi attivi al secondo corrente
+        timeline.forEach(ev => {
+          if (Math.abs(ev.start - currentTime) < 0.1) {
+            if (ev.type === 'dialogue') {
+              showDialogueOverlay(ev.speaker, ev.text);
+            } else if (ev.type === 'move') {
+              animateActorMove(ev);
+            }
+          }
+        });
+
+        currentTime += 0.1;
+        document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
+
+        if (currentTime >= 10) { stopPreview(); clearInterval(interval); }
+      }, 100);
+    }
+
+    function showDialogueOverlay(speaker, text) {
+      isDialogueWaiting = true;
+      document.getElementById('dialogue-speaker-name').innerText = speaker;
+      document.getElementById('dialogue-text-content').innerText = text;
+      document.getElementById('dialogue-overlay').style.display = 'block';
+    }
+
+    function advanceDialogue() {
+      document.getElementById('dialogue-overlay').style.display = 'none';
+      isDialogueWaiting = false; // SBLOCCA LA SCENA
+    }
+
+    function animateActorMove(ev) {
+      const actorKey = ev.actor === 'main_character' ? 'hero' : ev.actor;
+      const el = document.getElementById(`actor-${actorKey}`);
+      if (!el) return;
+
+      let frame = 0;
+      const steps = Math.floor(ev.duration * 4);
+      const timer = setInterval(() => {
+        if (frame >= steps || !isPreviewRunning) { clearInterval(timer); return; }
+        frame++;
+        const p = frame / steps;
+        el.style.left = `${Math.round(ev.from[0] + (ev.to[0] - ev.from[0]) * p)}px`;
+        el.style.top = `${Math.round(ev.from[1] + (ev.to[1] - ev.from[1]) * p)}px`;
+      }, 250);
+    }
+
+    function stopPreview() {
+      isPreviewRunning = false;
+      isDialogueWaiting = false;
+      bgAudio.pause();
+      document.getElementById('dialogue-overlay').style.display = 'none';
+    }
+
+    // IMPORT & SUPABASE SAVE/LOAD
+    async function saveToSupabase() {
+      let name = prompt("Nome della cutscene su Supabase:", currentCutsceneName);
+      if (!name) return;
+      if (!name.endsWith('.json')) name += '.json';
+
+      const { data: existing } = await _supabase.storage.from('assets').list('cutscenes');
+      const exists = existing?.some(f => f.name === name);
+
+      if (exists) {
+        if (!confirm(`La cutscene "${name}" esiste già. Vuoi sovrascriverla?`)) return;
+      }
+
+      const cutsceneData = generateJSONData();
+      await _supabase.storage.from('assets').upload(`cutscenes/${name}`, JSON.stringify(cutsceneData), { contentType: 'application/json', upsert: true });
+      currentCutsceneName = name;
+      alert(`Cutscene "${name}" salvata con successo!`);
+    }
+
+    async function loadCutsceneFromSupabase() {
+      const { data } = await _supabase.storage.from('assets').list('cutscenes');
+      if (!data || !data.length) return alert("Nessuna cutscene trovata su Supabase!");
+
+      const names = data.map(f => f.name).join("\n");
+      const chosen = prompt(`Digita il nome della cutscene da caricare:\n\n${names}`);
+      if (!chosen) return;
+
+      const { data: fileData } = await _supabase.storage.from('assets').download(`cutscenes/${chosen}`);
+      if (fileData) {
+        const text = await fileData.text();
+        applyCutsceneData(JSON.parse(text));
+        currentCutsceneName = chosen;
+      }
+    }
+
+    function importLocalJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        applyCutsceneData(JSON.parse(evt.target.result));
+        alert("JSON importato correttamente!");
+      };
+      reader.readAsText(file);
+    }
+
+    function applyCutsceneData(data) {
+      timeline.length = 0;
+      if (data.timeline) timeline.push(...data.timeline);
+      renderTimeline();
+    }
+
+    function generateJSONData() {
+      return {
+        setup: {
+          background: selections.background || "background/trama1/fallback.png",
+          music: selections.music || "music/fallback.mp3",
+          main_character: { pose: document.getElementById('hero-pose').value, fallback_folder: "sprite/personaggioprincipale/fallback/", initial_position: positions.main_character },
+          png: { folder: selections.npcFolder || "sprite/png/default/", initial_position: positions.png },
+          companion: { folder: selections.companion || "sprite/companion/fallback/", initial_position: positions.companion }
+        },
+        timeline: timeline
+      };
+    }
+
+    function exportJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(generateJSONData(), null, 2));
+      const a = document.createElement('a');
+      a.href = dataStr;
+      a.download = currentCutsceneName;
+      a.click();
+    }
+
+    // GENERIC ASSET PICKER UTILS
     async function openPicker(category) {
       currentCategory = category;
       document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
@@ -328,232 +586,21 @@
     async function loadPickerItems() {
       const container = document.getElementById('asset-container');
       container.innerHTML = 'Caricamento...';
-
-      if (currentCategory === 'background') {
-        const { data } = await _supabase.storage.from('assets').list('background');
-        container.innerHTML = '';
-        if (data) {
-          for (const folder of data) {
-            if (!folder.id) {
-              const { data: files } = await _supabase.storage.from('assets').list(`background/${folder.name}`);
-              files?.forEach(f => {
-                const fullPath = `background/${folder.name}/${f.name}`;
-                createAssetCard(container, fullPath, `${folder.name}/${f.name}`, () => {
-                  selections.background = fullPath;
-                  document.getElementById('lbl-bg').innerText = `✅ ${f.name}`;
-                  document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath})`;
-                  closePicker();
-                });
-              });
-            }
-          }
-        }
-      } else if (currentCategory === 'npc') {
-        const { data } = await _supabase.storage.from('assets').list('sprite/png');
-        container.innerHTML = '';
-        data?.forEach(folder => {
-          if (!folder.id) {
-            const standingPath = `sprite/png/${folder.name}/standing.png`;
-            createAssetCard(container, standingPath, folder.name, () => openNpcPoseSelector(folder.name));
-          }
-        });
-      } else {
-        const path = currentCategory === 'music' ? 'music' : 'sprite/companion';
-        const { data } = await _supabase.storage.from('assets').list(path);
-        container.innerHTML = '';
-        data?.forEach(f => {
-          const fullPath = `${path}/${f.name}`;
-          createAssetCard(container, fullPath, f.name, () => {
-            selections[currentCategory] = fullPath;
-            document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${f.name}`;
-            if (currentCategory === 'companion') {
-              document.getElementById('actor-companion').style.display = 'flex';
-              document.getElementById('img-companion').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
-            }
-            closePicker();
-          });
-        });
-      }
-    }
-
-    function openNpcPoseSelector(npcName) {
-      const container = document.getElementById('asset-container');
+      const path = currentCategory === 'music' ? 'music' : 'sprite/companion';
+      const { data } = await _supabase.storage.from('assets').list(path);
       container.innerHTML = '';
-      ['standing', 'left', 'right', 'back'].forEach(pose => {
-        const fullPath = `sprite/png/${npcName}/${pose}.png`;
-        createAssetCard(container, fullPath, pose, () => {
-          selections.npcFolder = `sprite/png/${npcName}/`;
-          selections.npcPoseFile = fullPath;
-          document.getElementById('lbl-npc').innerText = `✅ ${npcName} (${pose})`;
-          document.getElementById('actor-npc').style.display = 'flex';
-          document.getElementById('img-npc').src = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+      data?.forEach(f => {
+        const fullPath = `${path}/${f.name}`;
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        card.innerHTML = currentCategory === 'music' ? `🎵<br><span>${f.name}</span>` : `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><span>${f.name}</span>`;
+        card.onclick = () => {
+          selections[currentCategory] = fullPath;
+          document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${f.name}`;
           closePicker();
-        });
-      });
-    }
-
-    function createAssetCard(container, fullPath, label, onClick) {
-      const card = document.createElement('div');
-      card.className = 'asset-card';
-      const url = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
-      if (currentCategory === 'music') card.innerHTML = `🎵<br><span>${label}</span>`;
-      else card.innerHTML = `<img src="${url}"><span>${label}</span>`;
-      card.onclick = onClick;
-      container.appendChild(card);
-    }
-
-    // TIMELINE MANAGEMENT
-    function addTimelineEvent() {
-      const type = document.getElementById('event-type').value;
-      const actor = document.getElementById('event-actor').value;
-      const duration = parseFloat(document.getElementById('event-duration').value);
-
-      let eventData = { type, actor, duration };
-
-      if (type === 'dialogue') {
-        eventData.text = document.getElementById('event-text').value;
-      } else {
-        eventData.from = [parseInt(document.getElementById('move-x1').value || 0), parseInt(document.getElementById('move-y1').value || 0)];
-        eventData.to = [parseInt(document.getElementById('move-x2').value || 0), parseInt(document.getElementById('move-y2').value || 0)];
-      }
-
-      timeline.push(eventData);
-      renderTimeline();
-    }
-
-    function renderTimeline() {
-      const tracks = document.getElementById('timeline-tracks');
-      tracks.innerHTML = '';
-      let currentTime = 0;
-
-      timeline.forEach((item, index) => {
-        const block = document.createElement('div');
-        block.className = `timeline-block ${item.type}`;
-        
-        const widthPct = (item.duration / 10) * 100;
-        const leftPct = (currentTime / 10) * 100;
-
-        block.style.left = `${leftPct}%`;
-        block.style.width = `${widthPct}%`;
-        block.innerText = `${index + 1}. [${item.actor}] ${item.type}`;
-
-        // EDIT & DELETE ON CLICK
-        block.onclick = () => {
-          const action = prompt(`Blocco #${index + 1}: Scegli azione\n1. Cambia durata (attuale: ${item.duration}s)\n2. Elimina blocco`, "1");
-          if (action === "1") {
-            const newDur = parseFloat(prompt("Nuova durata in secondi:", item.duration));
-            if (newDur > 0) item.duration = newDur;
-          } else if (action === "2") {
-            timeline.splice(index, 1);
-          }
-          renderTimeline();
         };
-
-        tracks.appendChild(block);
-        currentTime += item.duration;
+        container.appendChild(card);
       });
-
-      document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
-    }
-
-    // GAMEBOY STYLE STEP-ANIMATION PREVIEW
-    function startPreview() {
-      if (isPreviewRunning) return;
-      isPreviewRunning = true;
-      let stepIndex = 0;
-
-      function executeNextStep() {
-        if (!isPreviewRunning || stepIndex >= timeline.length) {
-          stopPreview();
-          return;
-        }
-
-        const ev = timeline[stepIndex];
-        const actorKey = ev.actor === 'main_character' ? 'hero' : ev.actor;
-        const actorEl = document.getElementById(`actor-${actorKey}`);
-
-        if (ev.type === 'move' && actorEl) {
-          // MOVIEMNTO A SCATTI (GAMEBOY GRID STEP)
-          let currentFrame = 0;
-          const totalFrames = Math.floor(ev.duration * 4); // 4 scatti al secondo
-          const startX = ev.from[0], startY = ev.from[1];
-          const endX = ev.to[0], endY = ev.to[1];
-
-          const moveTimer = setInterval(() => {
-            if (!isPreviewRunning || currentFrame >= totalFrames) {
-              clearInterval(moveTimer);
-              stepIndex++;
-              executeNextStep();
-              return;
-            }
-            currentFrame++;
-            const progress = currentFrame / totalFrames;
-            const stepX = Math.round(startX + (endX - startX) * progress);
-            const stepY = Math.round(startY + (endY - startY) * progress);
-
-            actorEl.style.left = `${stepX}px`;
-            actorEl.style.top = `${stepY}px`;
-          }, 250); // Scatto ogni 250ms
-        } else {
-          setTimeout(() => {
-            stepIndex++;
-            executeNextStep();
-          }, ev.duration * 1000);
-        }
-      }
-
-      executeNextStep();
-    }
-
-    function stopPreview() {
-      isPreviewRunning = false;
-      if (previewInterval) clearInterval(previewInterval);
-      alert("Anteprima fermata.");
-    }
-
-    // SAVE DIRECTLY TO SUPABASE
-    async function saveToSupabase() {
-      const cutsceneData = generateJSONData();
-      const filename = `cutscene_${Date.now()}.json`;
-
-      const { error } = await _supabase.storage.from('assets').upload(`cutscenes/${filename}`, JSON.stringify(cutsceneData), {
-        contentType: 'application/json',
-        upsert: true
-      });
-
-      if (error) alert("Errore nel salvataggio su Supabase: " + error.message);
-      else alert(`Cutscene salvata direttamente su Supabase in assets/cutscenes/${filename}`);
-    }
-
-    function generateJSONData() {
-      return {
-        setup: {
-          background: selections.background || "background/trama1/fallback.png",
-          music: selections.music || "music/fallback.mp3",
-          main_character: {
-            pose: document.getElementById('hero-pose').value,
-            fallback_folder: "sprite/personaggioprincipale/fallback/",
-            initial_position: positions.main_character
-          },
-          png: {
-            folder: selections.npcFolder || "sprite/png/default/",
-            initial_position: positions.png
-          },
-          companion: {
-            folder: selections.companion || "sprite/companion/fallback/",
-            initial_position: positions.companion
-          }
-        },
-        timeline: timeline
-      };
-    }
-
-    function exportJSON() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(generateJSONData(), null, 2));
-      const a = document.createElement('a');
-      a.href = dataStr;
-      a.download = "cutscene_daily.json";
-      a.click();
     }
   </script>
 </body>
