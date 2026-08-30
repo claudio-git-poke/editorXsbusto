@@ -26,15 +26,6 @@
 
   <h1>Cutscene Studio</h1>
 
-  <div class="panel">
-    <h3>Connessione Supabase</h3>
-    <div style="display: flex; gap: 10px;">
-      <input type="text" id="supabase-url" placeholder="https://xyz.supabase.co" style="flex: 1;">
-      <input type="password" id="supabase-key" placeholder="Anon Key" style="flex: 1;">
-      <button onclick="connectSupabase()">Connetti</button>
-    </div>
-  </div>
-
   <div class="grid">
     <div>
       <div class="panel">
@@ -106,36 +97,18 @@
   </div>
 
   <script>
-    let _supabase = null;
+    // Dati di connessione a Supabase preconfigurati
+    const SUPABASE_URL = "https://tssgkiytaxmcrodrcrpu.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_3JHORvzXFoBh7XVVuSqgTg__ezQdQMa";
+
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const timeline = [];
 
-    function connectSupabase() {
-      const url = document.getElementById('supabase-url').value.trim();
-      const key = document.getElementById('supabase-key').value.trim();
-
-      if (!url || !key) return alert("Inserisci URL e Key di Supabase!");
-
-      _supabase = supabase.createClient(url, key);
-      localStorage.setItem('sb_url', url);
-      localStorage.setItem('sb_key', key);
-
-      alert("Connesso con successo!");
-      loadAssets();
-    }
-
     window.onload = () => {
-      const savedUrl = localStorage.getItem('sb_url');
-      const savedKey = localStorage.getItem('sb_key');
-      if (savedUrl && savedKey) {
-        document.getElementById('supabase-url').value = savedUrl;
-        document.getElementById('supabase-key').value = savedKey;
-        _supabase = supabase.createClient(savedUrl, savedKey);
-        loadAssets();
-      }
+      loadAssets();
     };
 
     async function loadAssets() {
-      if (!_supabase) return;
       const allFiles = await fetchAllAssets('');
       
       const bgs = allFiles.filter(f => f.startsWith('background/'));
@@ -219,7 +192,6 @@
     }
 
     async function uploadAsset() {
-      if (!_supabase) return alert("Connettiti prima a Supabase!");
       const folder = document.getElementById('upload-folder').value.trim();
       const fileInput = document.getElementById('upload-file');
       const file = fileInput.files[0];
