@@ -45,7 +45,6 @@
     .timeline-block.dialogue { background: #f59e0b; }
     .timeline-block.move { background: #3b82f6; }
     
-    /* BORDO PER RESIZE TIMELINE */
     .resizer-right { position: absolute; right: 0; top: 0; width: 8px; height: 100%; cursor: e-resize; background: rgba(255,255,255,0.3); border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
@@ -257,6 +256,7 @@
 
     const selections = { background: '', music: '', npcFolder: '', companion: '' };
     const initialPositions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
+    const activeMoveAnimations = [];
     const timeline = [];
     let currentCategory = '';
     let isPreviewRunning = false;
@@ -299,7 +299,6 @@
       document.getElementById('img-hero').src = `${SUPABASE_URL}/storage/v1/object/public/assets/sprite/personaggioprincipale/fallback/${pose}.png`;
     }
 
-    // MEMORIZZA POSIZIONE INIZIALE TRAMITE DRAG DEGLI ATTORI
     function setupActorDrags() {
       document.querySelectorAll('.draggable-actor').forEach(actor => {
         let isDragging = false, offset = [0, 0];
@@ -322,7 +321,6 @@
       });
     }
 
-    // CARICAMENTO ED ESPLORAZIONE CARTELLE ASSET (BG, PNG, MUSIC, COMPANION)
     async function openPicker(category) {
       currentCategory = category;
       document.getElementById('modal-title').innerText = `Gestione ${category.toUpperCase()}`;
@@ -372,14 +370,23 @@
       const { data } = await _supabase.storage.from('assets').list(fetchPath);
       container.innerHTML = '';
 
-      data?.forEach(item => {
+      for (const item of data || []) {
         const fullPath = `${fetchPath}/${item.name}`;
         const card = document.createElement('div');
         card.className = 'asset-card';
 
-        // SE È UNA CARTELLA
+        // GESTIONE CARTELLA CON VERIFICA "standing.png" PER ANTEPRIMA
         if (!item.id) {
-          card.innerHTML = `📁<br><span style="font-size:11px; font-weight:bold;">${item.name}</span>`;
+          const { data: folderContents } = await _supabase.storage.from('assets').list(fullPath);
+          const hasStanding = folderContents?.some(f => f.name === 'standing.png');
+
+          if (hasStanding) {
+            const previewUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}/standing.png`;
+            card.innerHTML = `<img src="${previewUrl}"><br><span style="font-size:11px; font-weight:bold;">${item.name}</span>`;
+          } else {
+            card.innerHTML = `📁<br><span style="font-size:11px; font-weight:bold;">${item.name}</span>`;
+          }
+
           card.onclick = () => loadPickerItems(item.name);
         } else {
           if (currentCategory === 'music') {
@@ -406,10 +413,9 @@
           };
         }
         container.appendChild(card);
-      });
+      }
     }
 
-    // MOVIEMNTO REGISTRATO VIA CLICK SU STAGE
     function startClickMovement() {
       clickMoveStep = 1;
       alert("Clicca sullo Stage per la POSIZIONE DI PARTENZA");
@@ -439,7 +445,6 @@
       }
     }
 
-    // TIMELINE MULTI-TRACK, DRAG & RESIZE BORD
     function toggleEventInputs() {
       const type = document.getElementById('event-type').value;
       document.getElementById('dialogue-fields').style.display = type === 'dialogue' ? 'block' : 'none';
@@ -485,7 +490,6 @@
         block.style.width = `${widthPct}%`;
         block.innerText = item.type === 'dialogue' ? `💬 ${item.speaker}: ${item.text}` : `🏃 ${item.actor}`;
 
-        // ELEMENTO PER RESIZE BORDO
         const resizer = document.createElement('div');
         resizer.className = 'resizer-right';
         block.appendChild(resizer);
@@ -496,7 +500,6 @@
         let initialStart = item.start;
         let initialDuration = item.duration;
 
-        // DRAG SPO SPOSTAMENTO TEMPO INIZIO
         block.addEventListener('mousedown', (e) => {
           if (e.target === resizer) return;
           e.stopPropagation();
@@ -505,7 +508,6 @@
           initialStart = item.start;
         });
 
-        // RESIZE DURATA TRASCINANDO IL BORDO
         resizer.addEventListener('mousedown', (e) => {
           e.stopPropagation();
           isResizing = true;
@@ -535,7 +537,6 @@
           }
         });
 
-        // APRI DETTAGLI E MODIFICA SU CLICK SUL BLOCCO
         block.addEventListener('click', (e) => {
           e.stopPropagation();
           openInspector(item);
@@ -618,23 +619,39 @@
       closePicker();
     }
 
-    // ANTEPRIMA & FIX RIPRODUZIONE AUDIO MUSICA
     function startPreview() {
       stopPreview();
       isPreviewRunning = true;
 
-      // Ripristina posizioni attori decise dall'utente
-      document.getElementById('actor-hero').style.left = `${initialPositions.main_character[0]}px`;
-      document.getElementById('actor-hero').style.top = `${initialPositions.main_character[1]}px`;
-      document.getElementById('actor-npc').style.left = `${initialPositions.png[0]}px`;
-      document.getElementById('actor-npc').style.top = `${initialPositions.png[1]}px`;
-      document.getElementById('actor-companion').style.left = `${initialPositions.companion[0]}px`;
-      document.getElementById('actor-companion').style.top = `${initialPositions.companion[1]}px`;
+      // PARTE 1: FORZA LA POSIZIONE INIZIALE DEGLI SPRITE IN BASE AL PRIMO MOVIMENTO
+      ['main_character', 'png', 'companion'].forEach(actorKey => {
+        const actorDomId = actorKey === 'main_character' ? 'actor-hero' : (actorKey === 'png' ? 'actor-npc' : 'actor-companion');
+        const moves = timeline.filter(e => e.type === 'move' && e.actor === actorKey).sort((a,b) => a.start - b.start);
+        
+        if (moves.length > 0) {
+          document.getElementById(actorDomId).style.left = `${moves[0].from[0]}px`;
+          document.getElementById(actorDomId).style.top = `${moves[0].from[1]}px`;
+        } else {
+          document.getElementById(actorDomId).style.left = `${initialPositions[actorKey][0]}px`;
+          document.getElementById(actorDomId).style.top = `${initialPositions[actorKey][1]}px`;
+        }
+      });
 
+      // PARTE 2: LOGGING AUDIO E PLAYBACK
       if (selections.music) {
-        bgAudio.src = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
+        const fullAudioUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
+        console.log("[AUDIO DEBUG] Trovata traccia selezionata:", selections.music);
+        console.log("[AUDIO DEBUG] URL completo:", fullAudioUrl);
+        
+        bgAudio.src = fullAudioUrl;
         bgAudio.loop = true;
-        bgAudio.play().catch(e => console.log("Audio play allowed on user click:", e));
+        bgAudio.play().then(() => {
+          console.log("[AUDIO DEBUG] Riproduzione avviata correttamente!");
+        }).catch(e => {
+          console.error("[AUDIO DEBUG] Errore riproduzione audio (Autoplay Block o URL non valido):", e);
+        });
+      } else {
+        console.warn("[AUDIO DEBUG] Nessuna traccia audio selezionata nelle opzioni.");
       }
 
       let currentTime = 0;
@@ -642,6 +659,8 @@
 
       previewTimer = setInterval(() => {
         if (!isPreviewRunning) return;
+
+        // SE UN DIALOGO È ATTIVO, IL TIMER DI SCENA NON AVANZA
         if (isDialogueWaiting) return;
 
         timeline.forEach(ev => {
@@ -674,32 +693,45 @@
       isDialogueWaiting = false;
     }
 
+    // ANIMAZIONE MOVIMENTO CON SUPPORTO AL PAUSE/FREEZE DIALOGO
     function animateActorMove(ev) {
-      const actorKey = ev.actor === 'main_character' ? 'hero' : ev.actor;
+      const actorKey = ev.actor === 'main_character' ? 'hero' : (ev.actor === 'png' ? 'npc' : 'companion');
       const el = document.getElementById(`actor-${actorKey}`);
       if (!el) return;
 
       let frame = 0;
-      const steps = Math.floor(ev.duration * 4);
+      const steps = Math.floor(ev.duration * 10);
+      
       const timer = setInterval(() => {
-        if (frame >= steps || !isPreviewRunning) { clearInterval(timer); return; }
+        if (!isPreviewRunning) { clearInterval(timer); return; }
+        
+        // PAUSA DEL MOVIMENTO IN CASO DI DIALOGO APERTO
+        if (isDialogueWaiting) return;
+
+        if (frame >= steps) { clearInterval(timer); return; }
         frame++;
+
         const p = frame / steps;
         el.style.left = `${Math.round(ev.from[0] + (ev.to[0] - ev.from[0]) * p)}px`;
         el.style.top = `${Math.round(ev.from[1] + (ev.to[1] - ev.from[1]) * p)}px`;
-      }, 250);
+      }, 100);
+
+      activeMoveAnimations.push(timer);
     }
 
     function stopPreview() {
       isPreviewRunning = false;
       isDialogueWaiting = false;
       if (previewTimer) clearInterval(previewTimer);
+      
+      activeMoveAnimations.forEach(t => clearInterval(t));
+      activeMoveAnimations.length = 0;
+
       bgAudio.pause();
       bgAudio.currentTime = 0;
       document.getElementById('dialogue-overlay').style.display = 'none';
     }
 
-    // IMPORTO / ESPORTO SUPABASE JSON
     async function saveToSupabase() {
       let name = prompt("Nome cutscene su Supabase:", currentCutsceneName);
       if (!name) return;
