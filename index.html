@@ -56,7 +56,6 @@
 </head>
 <body>
 
-  <!-- AUTH SCREEN -->
   <div id="auth-screen" class="panel">
     <h3>Login Editor Cutscene</h3>
     <div id="auth-logged" style="display:none;">
@@ -76,7 +75,6 @@
     </div>
   </div>
 
-  <!-- EDITOR INTERFACE -->
   <div id="editor-screen" style="display:none;">
     <h1>Cutscene Studio Pro</h1>
 
@@ -113,13 +111,15 @@
           </div>
 
           <div class="field">
-            <label>PNG / NPC:</label>
-            <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona NPC...</button>
+            <label>Nome PNG / NPC:</label>
+            <input type="text" id="npc-name-input" value="NPC 1" onchange="updateActorLabels()">
+            <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona Asset NPC...</button>
           </div>
 
           <div class="field">
-            <label>Companion:</label>
-            <button class="btn-select" id="lbl-companion" onclick="openPicker('companion')">📁 Seleziona Companion...</button>
+            <label>Nome Companion:</label>
+            <input type="text" id="companion-name-input" value="Companion 1" onchange="updateActorLabels()">
+            <button class="btn-select" id="lbl-companion" onclick="openPicker('companion')">📁 Seleziona Asset Companion...</button>
           </div>
         </div>
 
@@ -137,10 +137,8 @@
             <div class="field">
               <label>Chi Parla:</label>
               <select id="dialogue-speaker">
-                <option value="main_character">Personaggio Principale</option>
-                <option value="png">PNG / NPC</option>
-                <option value="companion">Companion</option>
-              </select>
+                <option value="Hero">Hero (Principale)</option>
+                </select>
             </div>
             <div class="field">
               <label>Testo Dialogo:</label>
@@ -152,10 +150,8 @@
             <div class="field">
               <label>Scegli Attore da Muovere:</label>
               <select id="move-actor">
-                <option value="main_character">Personaggio Principale</option>
-                <option value="png">PNG / NPC</option>
-                <option value="companion">Companion</option>
-              </select>
+                <option value="Hero">Hero (Principale)</option>
+                </select>
             </div>
 
             <button type="button" style="background:#8b5cf6; margin-bottom:8px;" onclick="startClickMovement()">🖱 Registra Coordinate su Stage</button>
@@ -186,15 +182,15 @@
         <div id="stage" class="stage-container" onclick="handleStageGlobalClick(event)">
           <div id="actor-hero" class="draggable-actor" style="left: 100px; top: 150px;">
             <img id="img-hero" src="">
-            <div class="actor-label">Hero</div>
+            <div class="actor-label" id="lbl-tag-hero">Hero</div>
           </div>
           <div id="actor-npc" class="draggable-actor" style="left: 300px; top: 150px; display:none;">
             <img id="img-npc" src="">
-            <div class="actor-label">NPC</div>
+            <div class="actor-label" id="lbl-tag-npc">NPC 1</div>
           </div>
           <div id="actor-companion" class="draggable-actor" style="left: 500px; top: 150px; display:none;">
             <img id="img-companion" src="">
-            <div class="actor-label">Companion</div>
+            <div class="actor-label" id="lbl-tag-companion">Companion 1</div>
           </div>
 
           <div id="dialogue-overlay">
@@ -237,7 +233,6 @@
     </div>
   </div>
 
-  <!-- MODAL ASSETS & INSPECTOR -->
   <div id="picker-modal" class="modal">
     <div class="modal-content">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
@@ -255,7 +250,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const selections = { background: '', music: '', npcFolder: '', companion: '' };
-    const initialPositions = { main_character: [100, 150], png: [300, 150], companion: [500, 150] };
+    const initialPositions = { Hero: [100, 150], NPC: [300, 150], Companion: [500, 150] };
     const activeMoveAnimations = [];
     const timeline = [];
     let currentCategory = '';
@@ -275,7 +270,23 @@
       }
       loadHeroFallback();
       setupActorDrags();
+      updateActorLabels();
     };
+
+    function updateActorLabels() {
+      const npcName = document.getElementById('npc-name-input').value || 'NPC 1';
+      const companionName = document.getElementById('companion-name-input').value || 'Companion 1';
+
+      document.getElementById('lbl-tag-npc').innerText = npcName;
+      document.getElementById('lbl-tag-companion').innerText = companionName;
+
+      // Aggiorna Selettori nei Form
+      const spkSelect = document.getElementById('dialogue-speaker');
+      const moveSelect = document.getElementById('move-actor');
+      
+      spkSelect.innerHTML = `<option value="Hero">Hero (Principale)</option><option value="${npcName}">${npcName}</option><option value="${companionName}">${companionName}</option>`;
+      moveSelect.innerHTML = `<option value="Hero">Hero (Principale)</option><option value="${npcName}">${npcName}</option><option value="${companionName}">${companionName}</option>`;
+    }
 
     async function login() {
       const email = document.getElementById('auth-email').value;
@@ -314,7 +325,7 @@
           actor.style.left = x + 'px';
           actor.style.top = y + 'px';
 
-          const key = actor.id === 'actor-hero' ? 'main_character' : (actor.id === 'actor-npc' ? 'png' : 'companion');
+          const key = actor.id === 'actor-hero' ? 'Hero' : (actor.id === 'actor-npc' ? 'NPC' : 'Companion');
           initialPositions[key] = [x, y];
         });
         document.addEventListener('mouseup', () => isDragging = false);
@@ -375,7 +386,6 @@
         const card = document.createElement('div');
         card.className = 'asset-card';
 
-        // GESTIONE CARTELLA CON VERIFICA "standing.png" PER ANTEPRIMA
         if (!item.id) {
           const { data: folderContents } = await _supabase.storage.from('assets').list(fullPath);
           const hasStanding = folderContents?.some(f => f.name === 'standing.png');
@@ -549,6 +559,9 @@
 
     function openInspector(item) {
       const modal = document.getElementById('picker-modal');
+      const npcName = document.getElementById('npc-name-input').value || 'NPC 1';
+      const companionName = document.getElementById('companion-name-input').value || 'Companion 1';
+
       document.getElementById('modal-title').innerText = `Modifica Evento (${item.type.toUpperCase()})`;
       document.getElementById('modal-upload-area').innerHTML = '';
       
@@ -565,11 +578,11 @@
           </div>
           ${item.type === 'dialogue' ? `
             <div class="field">
-              <label>Chi Parla:</label>
+              <label>Chi Parla (Nome Oggetto):</label>
               <select id="edit-speaker">
-                <option value="main_character" ${item.speaker === 'main_character' ? 'selected' : ''}>Personaggio Principale</option>
-                <option value="png" ${item.speaker === 'png' ? 'selected' : ''}>PNG / NPC</option>
-                <option value="companion" ${item.speaker === 'companion' ? 'selected' : ''}>Companion</option>
+                <option value="Hero" ${item.speaker === 'Hero' ? 'selected' : ''}>Hero (Principale)</option>
+                <option value="${npcName}" ${item.speaker === npcName ? 'selected' : ''}>${npcName}</option>
+                <option value="${companionName}" ${item.speaker === companionName ? 'selected' : ''}>${companionName}</option>
               </select>
             </div>
             <div class="field">
@@ -577,6 +590,14 @@
               <input type="text" id="edit-text" value="${item.text}">
             </div>
           ` : `
+            <div class="field">
+              <label>Attore da Muovere:</label>
+              <select id="edit-actor">
+                <option value="Hero" ${item.actor === 'Hero' ? 'selected' : ''}>Hero (Principale)</option>
+                <option value="${npcName}" ${item.actor === npcName ? 'selected' : ''}>${npcName}</option>
+                <option value="${companionName}" ${item.actor === companionName ? 'selected' : ''}>${companionName}</option>
+              </select>
+            </div>
             <div class="field">
               <label>Coordinate Partenza (X, Y):</label>
               <input type="text" id="edit-from" value="${item.from.join(',')}">
@@ -588,7 +609,7 @@
           `}
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn-success" onclick="saveInspector(${item.id})">Salva Modifiche</button>
-            <button style="background:#dc3545;" onclick="deleteEvent(${item.id})">Elimina Evento</button>
+            <button style="background:#dc3545;" onclick="deleteEvent(${item.id})">🗑 Elimina Evento</button>
           </div>
         </div>
       `;
@@ -605,6 +626,7 @@
         item.speaker = document.getElementById('edit-speaker').value;
         item.text = document.getElementById('edit-text').value;
       } else {
+        item.actor = document.getElementById('edit-actor').value;
         item.from = document.getElementById('edit-from').value.split(',').map(Number);
         item.to = document.getElementById('edit-to').value.split(',').map(Number);
       }
@@ -623,45 +645,40 @@
       stopPreview();
       isPreviewRunning = true;
 
-      // PARTE 1: FORZA LA POSIZIONE INIZIALE DEGLI SPRITE IN BASE AL PRIMO MOVIMENTO
-      ['main_character', 'png', 'companion'].forEach(actorKey => {
-        const actorDomId = actorKey === 'main_character' ? 'actor-hero' : (actorKey === 'png' ? 'actor-npc' : 'actor-companion');
-        const moves = timeline.filter(e => e.type === 'move' && e.actor === actorKey).sort((a,b) => a.start - b.start);
+      const npcName = document.getElementById('npc-name-input').value || 'NPC 1';
+      const companionName = document.getElementById('companion-name-input').value || 'Companion 1';
+
+      const actorMapping = {
+        'Hero': { domId: 'actor-hero', key: 'Hero' },
+        [npcName]: { domId: 'actor-npc', key: 'NPC' },
+        [companionName]: { domId: 'actor-companion', key: 'Companion' }
+      };
+
+      // Posizionamento iniziale basato sul primo movimento
+      Object.keys(actorMapping).forEach(actorName => {
+        const info = actorMapping[actorName];
+        const moves = timeline.filter(e => e.type === 'move' && e.actor === actorName).sort((a,b) => a.start - b.start);
         
         if (moves.length > 0) {
-          document.getElementById(actorDomId).style.left = `${moves[0].from[0]}px`;
-          document.getElementById(actorDomId).style.top = `${moves[0].from[1]}px`;
+          document.getElementById(info.domId).style.left = `${moves[0].from[0]}px`;
+          document.getElementById(info.domId).style.top = `${moves[0].from[1]}px`;
         } else {
-          document.getElementById(actorDomId).style.left = `${initialPositions[actorKey][0]}px`;
-          document.getElementById(actorDomId).style.top = `${initialPositions[actorKey][1]}px`;
+          document.getElementById(info.domId).style.left = `${initialPositions[info.key][0]}px`;
+          document.getElementById(info.domId).style.top = `${initialPositions[info.key][1]}px`;
         }
       });
 
-      // PARTE 2: LOGGING AUDIO E PLAYBACK
       if (selections.music) {
-        const fullAudioUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
-        console.log("[AUDIO DEBUG] Trovata traccia selezionata:", selections.music);
-        console.log("[AUDIO DEBUG] URL completo:", fullAudioUrl);
-        
-        bgAudio.src = fullAudioUrl;
+        bgAudio.src = `${SUPABASE_URL}/storage/v1/object/public/assets/${selections.music}`;
         bgAudio.loop = true;
-        bgAudio.play().then(() => {
-          console.log("[AUDIO DEBUG] Riproduzione avviata correttamente!");
-        }).catch(e => {
-          console.error("[AUDIO DEBUG] Errore riproduzione audio (Autoplay Block o URL non valido):", e);
-        });
-      } else {
-        console.warn("[AUDIO DEBUG] Nessuna traccia audio selezionata nelle opzioni.");
+        bgAudio.play().catch(e => console.error(e));
       }
 
       let currentTime = 0;
       const triggeredEvents = new Set();
 
       previewTimer = setInterval(() => {
-        if (!isPreviewRunning) return;
-
-        // SE UN DIALOGO È ATTIVO, IL TIMER DI SCENA NON AVANZA
-        if (isDialogueWaiting) return;
+        if (!isPreviewRunning || isDialogueWaiting) return;
 
         timeline.forEach(ev => {
           if (!triggeredEvents.has(ev.id) && currentTime >= ev.start) {
@@ -693,10 +710,15 @@
       isDialogueWaiting = false;
     }
 
-    // ANIMAZIONE MOVIMENTO CON SUPPORTO AL PAUSE/FREEZE DIALOGO
     function animateActorMove(ev) {
-      const actorKey = ev.actor === 'main_character' ? 'hero' : (ev.actor === 'png' ? 'npc' : 'companion');
-      const el = document.getElementById(`actor-${actorKey}`);
+      const npcName = document.getElementById('npc-name-input').value || 'NPC 1';
+      const companionName = document.getElementById('companion-name-input').value || 'Companion 1';
+      
+      let domId = 'actor-hero';
+      if (ev.actor === npcName) domId = 'actor-npc';
+      if (ev.actor === companionName) domId = 'actor-companion';
+
+      const el = document.getElementById(domId);
       if (!el) return;
 
       let frame = 0;
@@ -704,8 +726,6 @@
       
       const timer = setInterval(() => {
         if (!isPreviewRunning) { clearInterval(timer); return; }
-        
-        // PAUSA DEL MOVIMENTO IN CASO DI DIALOGO APERTO
         if (isDialogueWaiting) return;
 
         if (frame >= steps) { clearInterval(timer); return; }
@@ -784,9 +804,9 @@
         setup: {
           background: selections.background || "background/fallback.png",
           music: selections.music || "music/fallback.mp3",
-          main_character: { pose: document.getElementById('hero-pose').value, initial_position: initialPositions.main_character },
-          png: { folder: selections.npcFolder, initial_position: initialPositions.png },
-          companion: { folder: selections.companion, initial_position: initialPositions.companion }
+          main_character: { pose: document.getElementById('hero-pose').value, initial_position: initialPositions.Hero },
+          png: { name: document.getElementById('npc-name-input').value, folder: selections.npcFolder, initial_position: initialPositions.NPC },
+          companion: { name: document.getElementById('companion-name-input').value, folder: selections.companion, initial_position: initialPositions.Companion }
         },
         timeline: timeline
       };
