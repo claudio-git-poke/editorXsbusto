@@ -9,17 +9,30 @@
     :root { --bg: #121212; --panel: #1e1e1e; --accent: #007acc; --border: #333; --text: #fff; }
     body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 20px; }
     h1, h3 { margin-top: 0; }
-    .grid { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+    .grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; }
     .panel { background: var(--panel); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
-    .field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+    .field { margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; }
     label { font-size: 0.85em; color: #aaa; }
-    select, input, button { padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid #444; border-radius: 4px; }
+    input, button, select { padding: 8px; background: #2a2a2a; color: var(--text); border: 1px solid #444; border-radius: 4px; }
     button { cursor: pointer; background: var(--accent); font-weight: bold; border: none; }
     button:hover { opacity: 0.9; }
+    .btn-select { background: #3a3a3a; border: 1px dashed #666; text-align: left; }
     .btn-success { background: #28a745; }
     .btn-warning { background: #e67e22; width: 100%; margin-top: 10px; }
     .track { display: flex; flex-direction: column; gap: 8px; background: #2a2a2a; padding: 10px; border-radius: 4px; min-height: 100px; }
-    .block { background: #333; border-left: 4px solid var(--accent); padding: 10px; border-radius: 4px; cursor: grab; display: flex; justify-content: space-between; align-items: center; }
+    .block { background: #333; border-left: 4px solid var(--accent); padding: 10px; border-radius: 4px; cursor: grab; display: flex; justify-content: space-between; }
+
+    /* Modal Fullscreen Styling */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 1000; padding: 30px; box-sizing: border-box; overflow-y: auto; }
+    .modal-content { background: var(--panel); border-radius: 8px; padding: 20px; max-width: 1200px; margin: 0 auto; border: 1px solid var(--border); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
+    .close-btn { background: #dc3545; padding: 6px 12px; }
+    .upload-box { background: #252525; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+    .asset-card { background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 10px; text-align: center; cursor: pointer; transition: transform 0.1s; }
+    .asset-card:hover { border-color: var(--accent); transform: scale(1.03); }
+    .asset-card img { max-width: 100%; height: 100px; object-fit: contain; }
+    .asset-card span { display: block; font-size: 0.8em; margin-top: 8px; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -33,27 +46,27 @@
         
         <div class="field">
           <label>Sfondo:</label>
-          <select id="select-bg"></select>
+          <button class="btn-select" id="lbl-bg" onclick="openPicker('background')">📁 Seleziona Sfondo...</button>
         </div>
 
         <div class="field">
           <label>Musica:</label>
-          <select id="select-music"></select>
+          <button class="btn-select" id="lbl-music" onclick="openPicker('music')">📁 Seleziona Musica...</button>
         </div>
 
         <div class="field">
-          <label>Personaggio Principale (Cartella):</label>
-          <select id="select-hero"></select>
+          <label>Personaggio Principale:</label>
+          <button class="btn-select" id="lbl-hero" onclick="openPicker('hero')">📁 Seleziona Personaggio...</button>
         </div>
 
         <div class="field">
-          <label>PNG / NPC (Cartella):</label>
-          <select id="select-npc"></select>
+          <label>PNG / NPC:</label>
+          <button class="btn-select" id="lbl-npc" onclick="openPicker('npc')">📁 Seleziona PNG...</button>
         </div>
 
         <div class="field">
-          <label>Companion (Cartella):</label>
-          <select id="select-companion"></select>
+          <label>Companion:</label>
+          <button class="btn-select" id="lbl-companion" onclick="openPicker('companion')">📁 Seleziona Companion...</button>
         </div>
       </div>
 
@@ -73,18 +86,6 @@
         </div>
         <button class="btn-success" onclick="addDialogue()">+ Aggiungi a Timeline</button>
       </div>
-
-      <div class="panel">
-        <h3>3. Carica Nuovo File Asset</h3>
-        <div class="field">
-          <label>Sottocartella Destinazione (es: sprite/png/rosso):</label>
-          <input type="text" id="upload-folder" placeholder="sprite/png/rosso">
-        </div>
-        <div class="field">
-          <input type="file" id="upload-file">
-        </div>
-        <button onclick="uploadAsset()">Carica su Supabase</button>
-      </div>
     </div>
 
     <div>
@@ -96,65 +97,107 @@
     </div>
   </div>
 
+  <!-- MODAL SELEZIONE VISUALE -->
+  <div id="picker-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Seleziona Asset</h2>
+        <button class="close-btn" onclick="closePicker()">Chiudi ✖</button>
+      </div>
+
+      <div class="upload-box">
+        <label>Carica nuovi file qui:</label>
+        <input type="file" id="modal-file-input">
+        <button onclick="uploadFromModal()">Carica Asset</button>
+      </div>
+
+      <div id="asset-container" class="asset-grid"></div>
+    </div>
+  </div>
+
   <script>
-    // Dati di connessione a Supabase preconfigurati
     const SUPABASE_URL = "https://tssgkiytaxmcrodrcrpu.supabase.co";
     const SUPABASE_KEY = "sb_publishable_3JHORvzXFoBh7XVVuSqgTg__ezQdQMa";
-
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const timeline = [];
 
-    window.onload = () => {
-      loadAssets();
+    const selections = { background: '', music: '', hero: '', npc: '', companion: '' };
+    const timeline = [];
+    let currentCategory = '';
+
+    const paths = {
+      background: 'background/trama1/',
+      music: 'music/',
+      hero: 'sprite/personaggioprincipale/',
+      npc: 'sprite/png/',
+      companion: 'sprite/companion/'
     };
 
-    async function loadAssets() {
-      const allFiles = await fetchAllAssets('');
-      
-      const bgs = allFiles.filter(f => f.startsWith('background/'));
-      const music = allFiles.filter(f => f.startsWith('music/'));
-      
-      const heroes = extractFolders(allFiles, 'sprite/personaggioprincipale/');
-      const npcs = extractFolders(allFiles, 'sprite/png/');
-      const companions = extractFolders(allFiles, 'sprite/companion/');
-
-      populateSelect('select-bg', bgs);
-      populateSelect('select-music', music);
-      populateSelect('select-hero', heroes);
-      populateSelect('select-npc', npcs);
-      populateSelect('select-companion', companions);
+    async function openPicker(category) {
+      currentCategory = category;
+      document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
+      document.getElementById('picker-modal').style.display = 'block';
+      await loadPickerItems();
     }
 
-    async function fetchAllAssets(folder) {
-      const { data, error } = await _supabase.storage.from('assets').list(folder);
-      if (error || !data) return [];
+    function closePicker() {
+      document.getElementById('picker-modal').style.display = 'none';
+    }
 
-      let files = [];
-      for (const item of data) {
-        const path = folder ? `${folder}/${item.name}` : item.name;
-        if (!item.id) { 
-          const subFiles = await fetchAllAssets(path);
-          files = files.concat(subFiles);
-        } else {
-          files.push(path);
-        }
+    async function loadPickerItems() {
+      const container = document.getElementById('asset-container');
+      container.innerHTML = 'Caricamento...';
+      
+      const folderPath = paths[currentCategory];
+      const { data, error } = await _supabase.storage.from('assets').list(folderPath);
+
+      if (error || !data) {
+        container.innerHTML = 'Nessun asset trovato.';
+        return;
       }
-      return files;
-    }
 
-    function extractFolders(files, prefix) {
-      const folders = new Set();
-      files.filter(f => f.startsWith(prefix)).forEach(f => {
-        const relative = f.replace(prefix, '');
-        const parts = relative.split('/');
-        if (parts.length > 1) folders.add(parts[0]);
+      container.innerHTML = '';
+      data.forEach(item => {
+        if (item.name === '.emptyFolderPlaceholder') return;
+
+        const fullPath = `${folderPath}${item.name}`;
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}`;
+
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+
+        if (currentCategory === 'music') {
+          card.innerHTML = `🎵 <span>${item.name}</span>`;
+        } else {
+          card.innerHTML = `<img src="${publicUrl}" alt="${item.name}"><span>${item.name}</span>`;
+        }
+
+        card.onclick = () => selectAsset(fullPath, item.name);
+        container.appendChild(card);
       });
-      return Array.from(folders);
     }
 
-    function populateSelect(id, items) {
-      const select = document.getElementById(id);
-      select.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
+    function selectAsset(fullPath, name) {
+      selections[currentCategory] = fullPath;
+      document.getElementById(`lbl-${currentCategory}`).innerText = `✅ ${name}`;
+      closePicker();
+    }
+
+    async function uploadFromModal() {
+      const fileInput = document.getElementById('modal-file-input');
+      const file = fileInput.files[0];
+      if (!file) return alert("Seleziona prima un file!");
+
+      const folderPath = paths[currentCategory];
+      const fullPath = `${folderPath}${file.name}`;
+
+      const { error } = await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
+
+      if (error) alert("Errore upload: " + error.message);
+      else {
+        alert("Caricato con successo!");
+        fileInput.value = '';
+        loadPickerItems();
+      }
     }
 
     function addDialogue() {
@@ -170,7 +213,6 @@
     function renderTimeline() {
       const container = document.getElementById('timeline-track');
       container.innerHTML = '';
-
       timeline.forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'block';
@@ -191,44 +233,23 @@
       });
     }
 
-    async function uploadAsset() {
-      const folder = document.getElementById('upload-folder').value.trim();
-      const fileInput = document.getElementById('upload-file');
-      const file = fileInput.files[0];
-
-      if (!folder || !file) return alert("Inserisci la cartella e seleziona un file!");
-
-      const fullPath = `${folder}/${file.name}`.replace(/\/+/g, '/');
-      const { error } = await _supabase.storage.from('assets').upload(fullPath, file, { upsert: true });
-
-      if (error) alert("Errore: " + error.message);
-      else {
-        alert("File caricato in: " + fullPath);
-        loadAssets();
-      }
-    }
-
     function exportJSON() {
-      const hero = document.getElementById('select-hero').value;
-      const npc = document.getElementById('select-npc').value;
-      const companion = document.getElementById('select-companion').value;
-
       const output = {
         setup: {
-          background: document.getElementById('select-bg').value || "background/trama1/fallback.png",
+          background: selections.background || "background/trama1/fallback.png",
           background_fallback: "background/trama1/fallback.png",
-          music: document.getElementById('select-music').value || "music/fallback.mp3",
+          music: selections.music || "music/fallback.mp3",
           music_fallback: "music/fallback.mp3",
           main_character: {
-            folder: hero ? `sprite/personaggioprincipale/${hero}/` : "sprite/personaggioprincipale/fallback/",
+            folder: selections.hero || "sprite/personaggioprincipale/fallback/",
             fallback_folder: "sprite/personaggioprincipale/fallback/"
           },
           png: {
-            folder: npc ? `sprite/png/${npc}/` : "sprite/png/default/",
+            folder: selections.npc || "sprite/png/default/",
             fallback_folder: "sprite/png/default/"
           },
           companion: {
-            folder: companion ? `sprite/companion/${companion}/` : "sprite/companion/fallback/",
+            folder: selections.companion || "sprite/companion/fallback/",
             fallback_folder: "sprite/companion/fallback/"
           }
         },
