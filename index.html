@@ -99,16 +99,25 @@
       <button style="background:#dc2626;" onclick="logout()">Disconnetti</button>
     </div>
 
-    <div class="panel" style="display:flex; gap:10px;">
+    <div class="panel" style="display:flex; gap:10px; flex-wrap:wrap;">
       <button style="background:#3b82f6;" onclick="loadCutsceneFromSupabase()">☁️ Carica da Supabase</button>
       <button style="background:#8b5cf6;" onclick="document.getElementById('import-json-file').click()">📂 Importa JSON</button>
       <input type="file" id="import-json-file" style="display:none;" accept=".json" onchange="importLocalJSON(event)">
+      
+      <button style="background:#0284c7;" onclick="triggerUploadBackground()">🖼️ Aggiungi Sfondo a Supabase</button>
+      <button style="background:#0d9488;" onclick="triggerUploadMusic()">🎵 Aggiungi Musica a Supabase</button>
+      <input type="file" id="hidden-bg-file" style="display:none;" accept="image/png,image/jpeg" onchange="uploadBackgroundFile(event)">
+      <input type="file" id="hidden-music-file" style="display:none;" accept="audio/mp3,audio/mpeg" onchange="uploadMusicFile(event)">
     </div>
 
     <div class="grid">
       <div>
         <div class="panel">
-          <h3>1. Ambiente Scena</h3>
+          <h3>1. Impostazioni Scena</h3>
+          <div class="field">
+            <label>Durata Totale Cutscene (s):</label>
+            <input type="number" id="cutscene-duration" value="8" min="1" max="60" onchange="updateCutsceneDuration()">
+          </div>
           <div class="field">
             <label>Sfondo Scena:</label>
             <button class="btn-select" id="lbl-bg" onclick="openPicker('background')">📁 Seleziona Sfondo...</button>
@@ -116,6 +125,10 @@
           <div class="field">
             <label>Musica:</label>
             <button class="btn-select" id="lbl-music" onclick="openPicker('music')">📁 Seleziona Musica...</button>
+          </div>
+          <div class="field">
+            <label>Dimensione Sprite Globale (%):</label>
+            <input type="number" id="global-sprite-scale" value="100" min="10" max="500" oninput="updateSpriteScale(this.value)">
           </div>
 
           <hr style="border-color:var(--border); margin:15px 0;">
@@ -168,7 +181,7 @@
 
         <div class="panel">
           <div class="timeline-header">
-            <h3>Timeline Entità & Eventi <span id="time-display">0.0 / 10.0 s</span></h3>
+            <h3>Timeline Entità & Eventi <span id="time-display">0.0 / 8.0 s</span></h3>
             <div>
               <button style="background:#2563eb;" onclick="startPreview()">▶ Riproduci</button>
               <button style="background:#dc2626;" onclick="stopPreview()">⏹ Stop</button>
@@ -176,13 +189,8 @@
           </div>
 
           <div class="timeline-wrapper" id="timeline-wrapper">
-            <div class="timeline-ruler">
-              <div class="ruler-mark">0s</div>
-              <div class="ruler-mark">2s</div>
-              <div class="ruler-mark">4s</div>
-              <div class="ruler-mark">6s</div>
-              <div class="ruler-mark">8s</div>
-              <div class="ruler-mark">10s</div>
+            <div class="timeline-ruler" id="timeline-ruler">
+              <!-- Righello generato dinamicamente -->
             </div>
             <div id="timeline-tracks" class="timeline-tracks"></div>
           </div>
@@ -214,6 +222,8 @@
 
     let backgroundPath = '';
     let musicPath = '';
+    let cutsceneDuration = 8;
+    let globalSpriteScale = 100;
     
     let actorsList = [
       { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [216, 111] }
@@ -222,7 +232,7 @@
     let timelineEvents = [];
     let isPreviewRunning = false;
     let isDialogueWaiting = false;
-    let clickMoveStep = 0; // 0 = disattivo, 'start' = seleziona iniziale, 'end' = seleziona finale
+    let clickMoveStep = 0; 
     let clickMoveTargetActor = null;
     let bgAudio = new Audio();
     let previewTimer = null;
@@ -238,6 +248,7 @@
         document.getElementById('auth-logged').style.display = 'none';
         document.getElementById('auth-form').style.display = 'block';
       }
+      renderRuler();
       renderStageActors();
       renderTimeline();
       updateDropdownOptions();
@@ -267,6 +278,88 @@
       document.getElementById('editor-screen').style.display = 'block';
     }
 
+    function updateCutsceneDuration() {
+      const val = parseFloat(document.getElementById('cutscene-duration').value);
+      if (val && val > 0) {
+        cutsceneDuration = val;
+        renderRuler();
+        renderTimeline();
+        document.getElementById('time-display').innerText = `0.0 / ${cutsceneDuration.toFixed(1)} s`;
+      }
+    }
+
+    function updateSpriteScale(val) {
+      globalSpriteScale = parseInt(val) || 100;
+      document.querySelectorAll('.draggable-actor').forEach(el => {
+        const img = el.querySelector('img');
+        if (img) {
+          const baseSize = 48;
+          const newSize = (baseSize * globalSpriteScale) / 100;
+          el.style.width = newSize + 'px';
+          el.style.height = newSize + 'px';
+        }
+      });
+    }
+
+    function renderRuler() {
+      const ruler = document.getElementById('timeline-ruler');
+      ruler.innerHTML = '';
+      const steps = 5;
+      for (let i = 0; i <= steps; i++) {
+        const timeMark = ((cutsceneDuration / steps) * i).toFixed(1);
+        const mark = document.createElement('div');
+        mark.className = 'ruler-mark';
+        mark.innerText = `${timeMark}s`;
+        ruler.appendChild(mark);
+      }
+    }
+
+    // --- FUNZIONI UPLOAD SUPABASE ---
+    function triggerUploadBackground() {
+      document.getElementById('hidden-bg-file').click();
+    }
+
+    async function uploadBackgroundFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Chiede se usare una cartella esistente o crearne una nuova
+      const folderChoice = prompt("Inserisci il nome della cartella in cui caricare lo sfondo (es. trama1 o un nuovo nome):");
+      if (!folderChoice) return;
+
+      const folderName = folderChoice.trim().toLowerCase().replace(/\s+/g, '-');
+      const filePath = `background/${folderName}/${file.name}`;
+
+      try {
+        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+        if (error) throw error;
+        alert("✅ Caricato");
+      } catch (e) {
+        alert("Errore durante l'upload dello sfondo: " + e.message);
+      }
+      event.target.value = '';
+    }
+
+    function triggerUploadMusic() {
+      document.getElementById('hidden-music-file').click();
+    }
+
+    async function uploadMusicFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const filePath = `music/${file.name}`;
+
+      try {
+        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+        if (error) throw error;
+        alert("✅ Caricato");
+      } catch (e) {
+        alert("Errore durante l'upload della musica: " + e.message);
+      }
+      event.target.value = '';
+    }
+
     async function loadCutsceneFromSupabase() {
       const dayNumber = prompt("Inserisci il numero del giorno da caricare (es. 1):");
       if (!dayNumber) return;
@@ -281,9 +374,14 @@
 
         backgroundPath = json.background || '';
         musicPath = json.music || '';
+        cutsceneDuration = json.duration || 8;
+        globalSpriteScale = json.spriteScale || 100;
         actorsList = json.actors || actorsList;
         timelineEvents.length = 0;
         if (json.events) timelineEvents.push(...json.events);
+
+        document.getElementById('cutscene-duration').value = cutsceneDuration;
+        document.getElementById('global-sprite-scale').value = globalSpriteScale;
 
         if (backgroundPath) {
           document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
@@ -293,6 +391,7 @@
           document.getElementById('lbl-music').innerText = `✅ Caricato`;
         }
 
+        renderRuler();
         renderStageActors();
         renderTimeline();
         updateDropdownOptions();
@@ -311,14 +410,20 @@
           const json = JSON.parse(e.target.result);
           backgroundPath = json.background || '';
           musicPath = json.music || '';
+          cutsceneDuration = json.duration || 8;
+          globalSpriteScale = json.spriteScale || 100;
           actorsList = json.actors || actorsList;
           timelineEvents.length = 0;
           if (json.events) timelineEvents.push(...json.events);
+
+          document.getElementById('cutscene-duration').value = cutsceneDuration;
+          document.getElementById('global-sprite-scale').value = globalSpriteScale;
 
           if (backgroundPath) {
             document.getElementById('stage').style.backgroundImage = `url(${SUPABASE_URL}/storage/v1/object/public/assets/${backgroundPath})`;
             document.getElementById('lbl-bg').innerText = `✅ Importato`;
           }
+          renderRuler();
           renderStageActors();
           renderTimeline();
           updateDropdownOptions();
@@ -341,6 +446,11 @@
         div.style.left = actor.pos[0] + 'px';
         div.style.top = actor.pos[1] + 'px';
 
+        const baseSize = 48;
+        const scaledSize = (baseSize * globalSpriteScale) / 100;
+        div.style.width = scaledSize + 'px';
+        div.style.height = scaledSize + 'px';
+
         div.innerHTML = `
           <img src="${SUPABASE_URL}/storage/v1/object/public/assets/${actor.asset}">
           <div class="actor-label">${actor.name}</div>
@@ -355,8 +465,8 @@
 
         document.addEventListener('mousemove', (e) => {
           if (!isDragging) return;
-          const maxW = 480 - 48;
-          const maxH = 270 - 48;
+          const maxW = 480 - scaledSize;
+          const maxH = 270 - scaledSize;
           const x = Math.max(0, Math.min(maxW, e.clientX + offset[0]));
           const y = Math.max(0, Math.min(maxH, e.clientY + offset[1]));
           div.style.left = x + 'px';
@@ -483,8 +593,8 @@
       timelineEvents.forEach(ev => {
         const block = document.createElement('div');
         block.className = `timeline-block ${ev.type}`;
-        block.style.left = `${(ev.start / 10) * 100}%`;
-        block.style.width = `${(ev.duration / 10) * 100}%`;
+        block.style.left = `${(ev.start / cutsceneDuration) * 100}%`;
+        block.style.width = `${(ev.duration / cutsceneDuration) * 100}%`;
         block.innerText = ev.type === 'dialogue' ? `💬 ${ev.speaker}: ${ev.text}` : `🏃 ${ev.actor}`;
         
         const resizerRight = document.createElement('div');
@@ -500,8 +610,8 @@
           function onMouseMove(e) {
             let deltaX = e.clientX - startX;
             let newWidthPx = Math.max(20, initialWidth + deltaX);
-            let newDuration = parseFloat(((newWidthPx / trackWidth) * 10).toFixed(1));
-            ev.duration = Math.min(10 - ev.start, newDuration);
+            let newDuration = parseFloat(((newWidthPx / trackWidth) * cutsceneDuration).toFixed(1));
+            ev.duration = Math.min(cutsceneDuration - ev.start, newDuration);
             renderTimeline();
           }
 
@@ -527,7 +637,7 @@
           function onMouseMove(e) {
             let deltaX = e.clientX - startX;
             let newLeftPx = Math.max(0, initialLeft + deltaX);
-            let newStart = parseFloat(((newLeftPx / trackWidth) * 10).toFixed(1));
+            let newStart = parseFloat(((newLeftPx / trackWidth) * cutsceneDuration).toFixed(1));
             let endSec = ev.start + ev.duration;
 
             if (newStart < endSec) {
@@ -591,7 +701,7 @@
     function startActorClickSelect(actorName, mode) {
       closePicker();
       clickMoveTargetActor = actorName;
-      clickMoveStep = mode; // 'start' o 'end'
+      clickMoveStep = mode; 
       alert(`Clicca sullo stage per impostare la posizione ${mode === 'start' ? 'iniziale' : 'finale'} di ${actorName}`);
     }
 
@@ -689,8 +799,9 @@
       if (clickMoveStep === 0) return;
 
       const rect = document.getElementById('stage').getBoundingClientRect();
-      const x = Math.round(e.clientX - rect.left - 24);
-      const y = Math.round(e.clientY - rect.top - 24);
+      const scaledSize = (48 * globalSpriteScale) / 100;
+      const x = Math.round(e.clientX - rect.left - (scaledSize / 2));
+      const y = Math.round(e.clientY - rect.top - (scaledSize / 2));
 
       const actorObj = actorsList.find(a => a.name === clickMoveTargetActor);
       if (actorObj) {
@@ -762,8 +873,8 @@
         });
 
         currentTime += 0.05;
-        document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / 10.0 s`;
-        if (currentTime >= 10.0) stopPreview();
+        document.getElementById('time-display').innerText = `${currentTime.toFixed(1)} / ${cutsceneDuration.toFixed(1)} s`;
+        if (currentTime >= cutsceneDuration) stopPreview();
       }, 50);
     }
 
@@ -777,7 +888,14 @@
     }
 
     function generateJSONData() {
-      return { background: backgroundPath, music: musicPath, actors: actorsList, events: timelineEvents };
+      return { 
+        duration: cutsceneDuration,
+        spriteScale: globalSpriteScale,
+        background: backgroundPath, 
+        music: musicPath, 
+        actors: actorsList, 
+        events: timelineEvents 
+      };
     }
 
     async function saveToSupabase() {
