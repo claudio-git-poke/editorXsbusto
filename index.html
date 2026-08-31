@@ -237,6 +237,7 @@
     let bgAudio = new Audio();
     let previewTimer = null;
     let pendingActorAssetType = '';
+    let currentPickerCategory = '';
 
     window.onload = async () => {
       const { data: { session } } = await _supabase.auth.getSession();
@@ -323,7 +324,6 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      // Chiede se usare una cartella esistente o crearne una nuova
       const folderChoice = prompt("Inserisci il nome della cartella in cui caricare lo sfondo (es. trama1 o un nuovo nome):");
       if (!folderChoice) return;
 
@@ -496,10 +496,11 @@
       openPicker(type);
     }
 
-    async function openPicker(category) {
+    async function openPicker(category, subFolder = '') {
+      currentPickerCategory = category;
       document.getElementById('modal-title').innerText = `Seleziona ${category.toUpperCase()}`;
       document.getElementById('picker-modal').style.display = 'block';
-      await loadPickerItems(category);
+      await loadPickerItems(category, subFolder);
     }
 
     function closePicker() { document.getElementById('picker-modal').style.display = 'none'; }
@@ -521,10 +522,25 @@
         const card = document.createElement('div');
         card.className = 'asset-card';
 
-        if (!item.id) {
+        // Se è una cartella (non ha un 'id' nel bucket supabase) e siamo nella selezione sprite (png o companion)
+        if (!item.id && (category === 'png' || category === 'companion')) {
+          // Tentiamo di prelevare l'anteprima di standing.png all'interno di questa sottocartella
+          const standingFilePath = `${fullPath}/standing.png`;
+          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${standingFilePath}`;
+
+          card.innerHTML = `
+            <img src="${publicUrl}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><text y=\'30\' font-size=\'25\'>📁</text></svg>';"><br>
+            <span style="font-size:11px;">${item.name}</span>
+          `;
+          card.onclick = () => openPicker(category, item.name);
+        } 
+        else if (!item.id) {
+          // Altre cartelle (es. sfondi)
           card.innerHTML = `📁<br><span style="font-size:11px;">${item.name}</span>`;
-          card.onclick = () => loadPickerItems(category, item.name);
-        } else {
+          card.onclick = () => openPicker(category, item.name);
+        } 
+        else {
+          // File singolo
           if (category === 'music') {
             card.innerHTML = `🎵<br><span style="font-size:11px;">${item.name}</span>`;
           } else {
@@ -661,7 +677,7 @@
       });
     }
 
-    function openActorInspector(actor) {
+    async function openActorInspector(actor) {
       document.getElementById('modal-title').innerText = `Gestisci Personaggio: ${actor.name}`;
       const container = document.getElementById('asset-container');
       const existingMove = timelineEvents.find(e => e.type === 'move' && e.actor === actor.name);
@@ -669,10 +685,22 @@
       const moveFrom = existingMove ? existingMove.from : [...actor.pos];
       const moveTo = existingMove ? existingMove.to : [actor.pos[0] + 50, actor.pos[1]];
 
+      let basePath = actor.asset.substring(0, actor.asset.lastIndexOf('/')) || 'sprite/personaggioprincipale/fallback';
+
       container.innerHTML = `
         <div style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:12px;">
           <div class="field"><label>Nome Personaggio:</label><input type="text" id="edit-actor-name" value="${actor.name}"></div>
           
+          <div class="field">
+            <label>Posa / Sprite:</label>
+            <select id="edit-actor-pose">
+              <option value="${basePath}/standing.png" ${actor.asset.endsWith('standing.png') ? 'selected' : ''}>Standing (Fronte)</option>
+              <option value="${basePath}/back.png" ${actor.asset.endsWith('back.png') ? 'selected' : ''}>Back (Retro)</option>
+              <option value="${basePath}/looking-left.png" ${actor.asset.endsWith('looking-left.png') ? 'selected' : ''}>Looking Left (Sinistra)</option>
+              <option value="${basePath}/looking-right.png" ${actor.asset.endsWith('looking-right.png') ? 'selected' : ''}>Looking Right (Destra)</option>
+            </select>
+          </div>
+
           <hr style="border-color:var(--border);">
           <h4>Posizione Iniziale</h4>
           <div style="display:flex; gap:10px; align-items:center;">
@@ -709,6 +737,7 @@
       const actor = actorsList.find(a => a.id === actorId);
       if (actor) {
         actor.name = document.getElementById('edit-actor-name').value;
+        actor.asset = document.getElementById('edit-actor-pose').value;
         actor.pos[0] = parseInt(document.getElementById('edit-actor-x').value || 0);
         actor.pos[1] = parseInt(document.getElementById('edit-actor-y').value || 0);
 
