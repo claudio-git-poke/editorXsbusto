@@ -46,11 +46,13 @@
       justify-content: center; 
       z-index: 10; 
     }
-    .draggable-actor img { max-width: 100%; max-height: 100%; pointer-events: none; image-rendering: pixelated; }
+    .draggable-actor img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; image-rendering: pixelated; }
     .actor-label { font-size: 8px; background: rgba(0,0,0,0.7); padding: 1px 3px; border-radius: 3px; margin-top: 1px; white-space: nowrap; }
 
     #dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); border: 2px solid #fff; border-radius: 6px; padding: 12px; color: #fff; z-index: 100; pointer-events: none; }
     #dialogue-overlay .speaker { font-weight: bold; color: #f59e0b; margin-bottom: 4px; }
+    #dialogue-overlay .text { font-style: normal; }
+    #dialogue-overlay .text.narrator-style { font-style: italic; }
 
     .timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .timeline-wrapper { background: #131625; border: 1px solid var(--border); border-radius: 6px; padding: 10px; position: relative; overflow-x: auto; user-select: none; }
@@ -224,10 +226,9 @@
     let musicPath = '';
     let cutsceneDuration = 8;
     let globalSpriteScale = 100;
+    let currentUsername = 'Utente';
     
-    let actorsList = [
-      { id: 'hero', name: 'Hero', type: 'hero', asset: 'sprite/personaggioprincipale/fallback/standing.png', pos: [216, 111] }
-    ];
+    let actorsList = [];
 
     let timelineEvents = [];
     let isPreviewRunning = false;
@@ -242,6 +243,7 @@
     window.onload = async () => {
       const { data: { session } } = await _supabase.auth.getSession();
       if (session) {
+        currentUsername = session.user.email.split('@')[0];
         document.getElementById('auth-logged').style.display = 'block';
         document.getElementById('auth-form').style.display = 'none';
         document.getElementById('user-info').innerText = `Logged: ${session.user.email}`;
@@ -249,6 +251,18 @@
         document.getElementById('auth-logged').style.display = 'none';
         document.getElementById('auth-form').style.display = 'block';
       }
+
+      // Inizializza l'attore principale con il nome utente se non già presente
+      if (actorsList.length === 0) {
+        actorsList.push({
+          id: 'hero',
+          name: currentUsername,
+          type: 'hero',
+          asset: 'sprite/personaggioprincipale/fallback/standing.png',
+          pos: [216, 111]
+        });
+      }
+
       renderRuler();
       renderStageActors();
       renderTimeline();
@@ -262,7 +276,18 @@
       if (error) {
         alert("Errore Autenticazione: " + error.message);
       } else {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (session) {
+          currentUsername = session.user.email.split('@')[0];
+          // Aggiorna anche il nome del primo attore se è rimasto quello di default o precedente
+          if (actorsList.length > 0 && actorsList[0].id === 'hero') {
+            actorsList[0].name = currentUsername;
+          }
+        }
         enterEditor();
+        renderStageActors();
+        renderTimeline();
+        updateDropdownOptions();
       }
     }
 
@@ -315,7 +340,6 @@
       }
     }
 
-    // --- FUNZIONI UPLOAD SUPABASE ---
     function triggerUploadBackground() {
       document.getElementById('hidden-bg-file').click();
     }
@@ -481,7 +505,7 @@
 
     function updateDropdownOptions() {
       const spkSelect = document.getElementById('dialogue-speaker');
-      spkSelect.innerHTML = '';
+      spkSelect.innerHTML = '<option value="Narratore">Narratore</option>';
       actorsList.forEach(a => {
         spkSelect.innerHTML += `<option value="${a.name}">${a.name}</option>`;
       });
@@ -522,29 +546,25 @@
         const card = document.createElement('div');
         card.className = 'asset-card';
 
-        // Se è una cartella (non ha un 'id' nel bucket supabase) e siamo nella selezione sprite (png o companion)
         if (!item.id && (category === 'png' || category === 'companion')) {
-          // Tentiamo di prelevare l'anteprima di standing.png all'interno di questa sottocartella
           const standingFilePath = `${fullPath}/standing.png`;
           const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/assets/${standingFilePath}`;
 
           card.innerHTML = `
-            <img src="${publicUrl}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><text y=\'30\' font-size=\'25\'>📁</text></svg>';"><br>
+            <img src="${publicUrl}" style="object-fit:contain;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><text y=\'30\' font-size=\'25\'>📁</text></svg>';"><br>
             <span style="font-size:11px;">${item.name}</span>
           `;
           card.onclick = () => openPicker(category, item.name);
         } 
         else if (!item.id) {
-          // Altre cartelle (es. sfondi)
           card.innerHTML = `📁<br><span style="font-size:11px;">${item.name}</span>`;
           card.onclick = () => openPicker(category, item.name);
         } 
         else {
-          // File singolo
           if (category === 'music') {
             card.innerHTML = `🎵<br><span style="font-size:11px;">${item.name}</span>`;
           } else {
-            card.innerHTML = `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}"><br><span style="font-size:11px;">${item.name}</span>`;
+            card.innerHTML = `<img src="${SUPABASE_URL}/storage/v1/object/public/assets/${fullPath}" style="object-fit:contain;"><br><span style="font-size:11px;">${item.name}</span>`;
           }
 
           card.onclick = () => {
@@ -894,8 +914,19 @@
             triggered.add(ev.id);
             if (ev.type === 'dialogue') {
               isDialogueWaiting = true;
-              document.getElementById('dialogue-speaker-name').innerText = ev.speaker;
-              document.getElementById('dialogue-text-content').innerText = ev.text;
+              const speakerEl = document.getElementById('dialogue-speaker-name');
+              const textEl = document.getElementById('dialogue-text-content');
+              
+              if (ev.speaker === 'Narratore') {
+                speakerEl.style.display = 'none';
+                textEl.className = 'text narrator-style';
+              } else {
+                speakerEl.style.display = 'block';
+                speakerEl.innerText = ev.speaker;
+                textEl.className = 'text';
+              }
+              
+              textEl.innerText = ev.text;
               document.getElementById('dialogue-overlay').style.display = 'block';
             }
           }
