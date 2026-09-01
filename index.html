@@ -61,7 +61,7 @@
     .timeline-tracks { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; min-height: 120px; width: 100%; }
     
     .track-row { position: relative; height: 36px; background: rgba(255,255,255,0.02); border-radius: 4px; width: 100%; display: flex; align-items: center; }
-    .track-label { width: 100px; font-size: 11px; font-weight: bold; padding-left: 8px; color: #a7f3d0; border-right: 1px solid var(--border); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
+    .track-label { width: 120px; font-size: 11px; font-weight: bold; padding-left: 8px; color: #a7f3d0; border-right: 1px solid var(--border); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex-shrink: 0; }
     .track-content { position: relative; flex: 1; height: 100%; }
 
     .timeline-block { position: absolute; height: 28px; top: 4px; background: #a855f7; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
@@ -228,8 +228,11 @@
     let globalSpriteScale = 100;
     let currentUsername = 'Utente';
     
-    let actorsList = [];
+    const STAGE_BASE_WIDTH = 480;
+    const STAGE_BASE_HEIGHT = 270;
+    const SPRITE_BASE_SIZE = 48;
 
+    let actorsList = [];
     let timelineEvents = [];
     let isPreviewRunning = false;
     let isDialogueWaiting = false;
@@ -252,7 +255,6 @@
         document.getElementById('auth-form').style.display = 'block';
       }
 
-      // Inizializza l'attore principale con il nome utente se non già presente
       if (actorsList.length === 0) {
         actorsList.push({
           id: 'hero',
@@ -279,7 +281,6 @@
         const { data: { session } } = await _supabase.auth.getSession();
         if (session) {
           currentUsername = session.user.email.split('@')[0];
-          // Aggiorna anche il nome del primo attore se è rimasto quello di default o precedente
           if (actorsList.length > 0 && actorsList[0].id === 'hero') {
             actorsList[0].name = currentUsername;
           }
@@ -317,13 +318,9 @@
     function updateSpriteScale(val) {
       globalSpriteScale = parseInt(val) || 100;
       document.querySelectorAll('.draggable-actor').forEach(el => {
-        const img = el.querySelector('img');
-        if (img) {
-          const baseSize = 48;
-          const newSize = (baseSize * globalSpriteScale) / 100;
-          el.style.width = newSize + 'px';
-          el.style.height = newSize + 'px';
-        }
+        const newSize = (SPRITE_BASE_SIZE * globalSpriteScale) / 100;
+        el.style.width = newSize + 'px';
+        el.style.height = newSize + 'px';
       });
     }
 
@@ -355,9 +352,9 @@
       const filePath = `background/${folderName}/${file.name}`;
 
       try {
-        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true, cacheControl: '0' });
         if (error) throw error;
-        alert("✅ Caricato");
+        alert("✅ Sfondo caricato/aggiornato con successo");
       } catch (e) {
         alert("Errore durante l'upload dello sfondo: " + e.message);
       }
@@ -375,9 +372,9 @@
       const filePath = `music/${file.name}`;
 
       try {
-        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true });
+        const { error } = await _supabase.storage.from('assets').upload(filePath, file, { upsert: true, cacheControl: '0' });
         if (error) throw error;
-        alert("✅ Caricato");
+        alert("✅ Musica caricata e sovrascritta correttamente");
       } catch (e) {
         alert("Errore durante l'upload della musica: " + e.message);
       }
@@ -470,8 +467,7 @@
         div.style.left = actor.pos[0] + 'px';
         div.style.top = actor.pos[1] + 'px';
 
-        const baseSize = 48;
-        const scaledSize = (baseSize * globalSpriteScale) / 100;
+        const scaledSize = (SPRITE_BASE_SIZE * globalSpriteScale) / 100;
         div.style.width = scaledSize + 'px';
         div.style.height = scaledSize + 'px';
 
@@ -489,8 +485,8 @@
 
         document.addEventListener('mousemove', (e) => {
           if (!isDragging) return;
-          const maxW = 480 - scaledSize;
-          const maxH = 270 - scaledSize;
+          const maxW = STAGE_BASE_WIDTH - scaledSize;
+          const maxH = STAGE_BASE_HEIGHT - scaledSize;
           const x = Math.max(0, Math.min(maxW, e.clientX + offset[0]));
           const y = Math.max(0, Math.min(maxH, e.clientY + offset[1]));
           div.style.left = x + 'px';
@@ -604,10 +600,11 @@
       const tracksContainer = document.getElementById('timeline-tracks');
       tracksContainer.innerHTML = '';
 
+      // Riga dedicata per ogni attore
       actorsList.forEach(actor => {
         const row = document.createElement('div');
         row.className = 'track-row';
-        row.innerHTML = `<div class="track-label">👤 ${actor.name}</div><div class="track-content" id="track-actor-${actor.id}"></div>`;
+        row.innerHTML = `<div class="track-label" title="${actor.name}">👤 ${actor.name}</div><div class="track-content" id="track-actor-${actor.id}"></div>`;
         tracksContainer.appendChild(row);
 
         const content = row.querySelector('.track-content');
@@ -615,85 +612,112 @@
         block.className = 'timeline-block actor-track';
         block.style.left = '0%';
         block.style.width = '100%';
-        block.innerText = `${actor.type.toUpperCase()}: ${actor.name}`;
+        block.innerText = `STATO: ${actor.type.toUpperCase()}`;
         block.onclick = () => openActorInspector(actor);
         content.appendChild(block);
       });
 
-      const eventRow = document.createElement('div');
-      eventRow.className = 'track-row';
-      eventRow.innerHTML = `<div class="track-label">🎬 Eventi</div><div class="track-content" id="track-events"></div>`;
-      tracksContainer.appendChild(eventRow);
+      // Riga dedicata per ogni movimento di attore
+      actorsList.forEach(actor => {
+        const row = document.createElement('div');
+        row.className = 'track-row';
+        row.innerHTML = `<div class="track-label" title="Mov: ${actor.name}">🏃 Mov: ${actor.name}</div><div class="track-content" id="track-move-${actor.id}"></div>`;
+        tracksContainer.appendChild(row);
 
-      const eventContent = eventRow.querySelector('#track-events');
-      timelineEvents.forEach(ev => {
+        const content = row.querySelector('.track-content');
+        const moveEvent = timelineEvents.find(e => e.type === 'move' && e.actor === actor.name);
+        
+        if (moveEvent) {
+          const block = document.createElement('div');
+          block.className = 'timeline-block move';
+          block.style.left = `${(moveEvent.start / cutsceneDuration) * 100}%`;
+          block.style.width = `${(moveEvent.duration / cutsceneDuration) * 100}%`;
+          block.innerText = `Sposta a [${moveEvent.to[0]}, ${moveEvent.to[1]}]`;
+          
+          addResizersToBlock(block, moveEvent, content);
+          block.onclick = () => openEventInspector(moveEvent);
+          content.appendChild(block);
+        }
+      });
+
+      // Riga dedicata per ogni singolo evento dialogo
+      timelineEvents.filter(ev => ev.type === 'dialogue').forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'track-row';
+        row.innerHTML = `<div class="track-label" title="Dia: ${ev.speaker}">💬 ${ev.speaker}</div><div class="track-content" id="track-dialogue-${ev.id}"></div>`;
+        tracksContainer.appendChild(row);
+
+        const content = row.querySelector('.track-content');
         const block = document.createElement('div');
-        block.className = `timeline-block ${ev.type}`;
+        block.className = 'timeline-block dialogue';
         block.style.left = `${(ev.start / cutsceneDuration) * 100}%`;
         block.style.width = `${(ev.duration / cutsceneDuration) * 100}%`;
-        block.innerText = ev.type === 'dialogue' ? `💬 ${ev.speaker}: ${ev.text}` : `🏃 ${ev.actor}`;
-        
-        const resizerRight = document.createElement('div');
-        resizerRight.className = 'resizer right';
-        block.appendChild(resizerRight);
+        block.innerText = `"${ev.text}"`;
 
-        resizerRight.addEventListener('mousedown', (e) => {
-          e.stopPropagation();
-          let startX = e.clientX;
-          let initialWidth = block.offsetWidth;
-          let trackWidth = eventContent.offsetWidth;
+        addResizersToBlock(block, ev, content);
+        block.onclick = () => openEventInspector(ev);
+        content.appendChild(block);
+      });
+    }
 
-          function onMouseMove(e) {
-            let deltaX = e.clientX - startX;
-            let newWidthPx = Math.max(20, initialWidth + deltaX);
-            let newDuration = parseFloat(((newWidthPx / trackWidth) * cutsceneDuration).toFixed(1));
-            ev.duration = Math.min(cutsceneDuration - ev.start, newDuration);
+    function addResizersToBlock(block, ev, eventContent) {
+      const resizerRight = document.createElement('div');
+      resizerRight.className = 'resizer right';
+      block.appendChild(resizerRight);
+
+      resizerRight.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        let startX = e.clientX;
+        let initialWidth = block.offsetWidth;
+        let trackWidth = eventContent.offsetWidth;
+
+        function onMouseMove(e) {
+          let deltaX = e.clientX - startX;
+          let newWidthPx = Math.max(20, initialWidth + deltaX);
+          let newDuration = parseFloat(((newWidthPx / trackWidth) * cutsceneDuration).toFixed(1));
+          ev.duration = Math.min(cutsceneDuration - ev.start, newDuration);
+          renderTimeline();
+        }
+
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      const resizerLeft = document.createElement('div');
+      resizerLeft.className = 'resizer left';
+      block.appendChild(resizerLeft);
+
+      resizerLeft.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        let startX = e.clientX;
+        let initialLeft = block.offsetLeft;
+        let trackWidth = eventContent.offsetWidth;
+
+        function onMouseMove(e) {
+          let deltaX = e.clientX - startX;
+          let newLeftPx = Math.max(0, initialLeft + deltaX);
+          let newStart = parseFloat(((newLeftPx / trackWidth) * cutsceneDuration).toFixed(1));
+          let endSec = ev.start + ev.duration;
+
+          if (newStart < endSec) {
+            ev.start = newStart;
+            ev.duration = parseFloat((endSec - newStart).toFixed(1));
             renderTimeline();
           }
+        }
 
-          function onMouseUp() {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-          }
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
 
-          document.addEventListener('mousemove', onMouseMove);
-          document.addEventListener('mouseup', onMouseUp);
-        });
-
-        const resizerLeft = document.createElement('div');
-        resizerLeft.className = 'resizer left';
-        block.appendChild(resizerLeft);
-
-        resizerLeft.addEventListener('mousedown', (e) => {
-          e.stopPropagation();
-          let startX = e.clientX;
-          let initialLeft = block.offsetLeft;
-          let trackWidth = eventContent.offsetWidth;
-
-          function onMouseMove(e) {
-            let deltaX = e.clientX - startX;
-            let newLeftPx = Math.max(0, initialLeft + deltaX);
-            let newStart = parseFloat(((newLeftPx / trackWidth) * cutsceneDuration).toFixed(1));
-            let endSec = ev.start + ev.duration;
-
-            if (newStart < endSec) {
-              ev.start = newStart;
-              ev.duration = parseFloat((endSec - newStart).toFixed(1));
-              renderTimeline();
-            }
-          }
-
-          function onMouseUp() {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-          }
-
-          document.addEventListener('mousemove', onMouseMove);
-          document.addEventListener('mouseup', onMouseUp);
-        });
-
-        block.onclick = () => openEventInspector(ev);
-        eventContent.appendChild(block);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
       });
     }
 
@@ -789,7 +813,11 @@
 
     function deleteActor(actorId) {
       const idx = actorsList.findIndex(a => a.id === actorId);
-      if (idx !== -1) actorsList.splice(idx, 1);
+      if (idx !== -1) {
+        const actor = actorsList[idx];
+        actorsList.splice(idx, 1);
+        timelineEvents = timelineEvents.filter(e => e.actor !== actor.name);
+      }
       renderStageActors();
       renderTimeline();
       updateDropdownOptions();
@@ -848,7 +876,7 @@
       if (clickMoveStep === 0) return;
 
       const rect = document.getElementById('stage').getBoundingClientRect();
-      const scaledSize = (48 * globalSpriteScale) / 100;
+      const scaledSize = (SPRITE_BASE_SIZE * globalSpriteScale) / 100;
       const x = Math.round(e.clientX - rect.left - (scaledSize / 2));
       const y = Math.round(e.clientY - rect.top - (scaledSize / 2));
 
@@ -948,13 +976,40 @@
     }
 
     function generateJSONData() {
+      // Inseriamo tutti i dati raw, dimensioni di riferimento e percentuali per calcoli autonomi
       return { 
+        meta: {
+          stageBaseWidth: STAGE_BASE_WIDTH,
+          stageBaseHeight: STAGE_BASE_HEIGHT,
+          spriteBaseSize: SPRITE_BASE_SIZE
+        },
         duration: cutsceneDuration,
-        spriteScale: globalSpriteScale,
+        spriteScalePercentage: globalSpriteScale,
         background: backgroundPath, 
         music: musicPath, 
-        actors: actorsList, 
-        events: timelineEvents 
+        actors: actorsList.map(a => ({
+          ...a,
+          posPercentage: [
+            parseFloat(((a.pos[0] / STAGE_BASE_WIDTH) * 100).toFixed(2)),
+            parseFloat(((a.pos[1] / STAGE_BASE_HEIGHT) * 100).toFixed(2))
+          ]
+        })), 
+        events: timelineEvents.map(e => {
+          if (e.type === 'move') {
+            return {
+              ...e,
+              fromPercentage: [
+                parseFloat(((e.from[0] / STAGE_BASE_WIDTH) * 100).toFixed(2)),
+                parseFloat(((e.from[1] / STAGE_BASE_HEIGHT) * 100).toFixed(2))
+              ],
+              toPercentage: [
+                parseFloat(((e.to[0] / STAGE_BASE_WIDTH) * 100).toFixed(2)),
+                parseFloat(((e.to[1] / STAGE_BASE_HEIGHT) * 100).toFixed(2))
+              ]
+            };
+          }
+          return e;
+        })
       };
     }
 
